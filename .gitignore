@@ -1,0 +1,6 @@
+# Don't include eclipse metadata associated with the project.
+.metadata 
+
+# Ignore the output directories. 
+Debug
+OSX
