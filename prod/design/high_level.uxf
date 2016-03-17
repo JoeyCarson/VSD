@@ -106,7 +106,7 @@ VideoReader</panel_attributes>
     </coordinates>
     <panel_attributes>ViolenceModel - Implements Gracia's Algorithm.
 OpenCV - Image processing algorithms to simplify feature extraction.
-NoSQLStore - Caches samples of training features.
+EJDBStore - Caches samples of training features.
 LearningKernel - Encapsulates machine learning algorithms.</panel_attributes>
     <additional_attributes/>
   </element>
@@ -118,7 +118,7 @@ LearningKernel - Encapsulates machine learning algorithms.</panel_attributes>
       <w>135</w>
       <h>45</h>
     </coordinates>
-    <panel_attributes>NoSQLStore
+    <panel_attributes>EJDBStore
 --</panel_attributes>
     <additional_attributes/>
   </element>

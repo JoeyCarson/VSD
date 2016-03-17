@@ -4,3 +4,4 @@
 # Ignore the output directories. 
 Debug
 OSX
+Release
