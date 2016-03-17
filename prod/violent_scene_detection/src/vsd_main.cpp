@@ -1,12 +1,25 @@
 #include <iostream>
 #include <ejdb/ejdb.h>
 
+#include "ViolenceModel.h"
+
 static EJDB *jb;
 
+int testEJDB();
+
 int main() {
+
+	ViolenceModel vm("video/fi473_xvid.avi");
+
+	//testEJDB();
+
+    return 0;
+}
+
+int testEJDB()
+{
     jb = ejdbnew();
-    if (!ejdbopen(jb, "addressbook",
-                  JBOWRITER | JBOCREAT | JBOTRUNC)) {
+    if (!ejdbopen(jb, "addressbook", JBOWRITER | JBOCREAT | JBOTRUNC)) {
     	return 1;
     }
 
@@ -23,9 +36,10 @@ int main() {
     bson_append_string(&bsrec, "phone", "333-222-333");
     bson_append_int(&bsrec, "age", 58);
     bson_finish(&bsrec);
+
     //Save BSON
     ejdbsavebson(coll, &bsrec, &oid);
-    //fprintf(stderr, "\nSaved Bruce");
+    fprintf(stderr, "\nSaved Bruce");
     bson_destroy(&bsrec);
 
     //Now execute query
@@ -43,7 +57,7 @@ int main() {
 
     uint32_t count;
     TCLIST *res = ejdbqryexecute(coll, q1, &count, 0, NULL);
-    //fprintf(stderr, "\n\nRecords found: %d\n", count);
+    fprintf(stderr, "\n\nRecords found: %d\n", count);
 
     //Now print the result set records
     for (int i = 0; i < TCLISTNUM(res); ++i) {
@@ -62,5 +76,4 @@ int main() {
     //Close database
     ejdbclose(jb);
     ejdbdel(jb);
-    return 0;
 }

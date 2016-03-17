@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<diagram program="umlet" version="12.0">
+  <zoom_level>10</zoom_level>
+  <element>
+    <type>com.umlet.element.SequenceDiagram</type>
+    <coordinates>
+      <x>60</x>
+      <y>90</y>
+      <w>750</w>
+      <h>110</h>
+    </coordinates>
+    <panel_attributes>title: Violence Detection
+_ViolenceModel:m~m_|_VideoReader:vr~vr_|_EJDBStore:db~db_|_LearningKernel:k~k_</panel_attributes>
+    <additional_attributes/>
+  </element>
+</diagram>

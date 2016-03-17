@@ -4,29 +4,6 @@
   <element>
     <type>com.umlet.element.Class</type>
     <coordinates>
-      <x>180</x>
-      <y>180</y>
-      <w>153</w>
-      <h>243</h>
-    </coordinates>
-    <panel_attributes>ViolenceDetector
---</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <type>com.umlet.element.Relation</type>
-    <coordinates>
-      <x>306</x>
-      <y>243</y>
-      <w>98</w>
-      <h>44</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;&lt;&lt;&lt;-</panel_attributes>
-    <additional_attributes>27;27;81;27</additional_attributes>
-  </element>
-  <element>
-    <type>com.umlet.element.Class</type>
-    <coordinates>
       <x>666</x>
       <y>432</y>
       <w>135</w>
@@ -39,27 +16,26 @@
   <element>
     <type>com.umlet.element.Class</type>
     <coordinates>
-      <x>387</x>
-      <y>324</y>
-      <w>198</w>
-      <h>153</h>
+      <x>666</x>
+      <y>378</y>
+      <w>135</w>
+      <h>45</h>
     </coordinates>
-    <panel_attributes>ViolenceModel
---
-extractFeatures(VideoReader)
-</panel_attributes>
+    <panel_attributes>EJDBStore
+--</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
-    <type>com.umlet.element.Relation</type>
+    <type>com.umlet.element.Class</type>
     <coordinates>
-      <x>558</x>
-      <y>432</y>
-      <w>125</w>
-      <h>44</h>
+      <x>180</x>
+      <y>180</y>
+      <w>153</w>
+      <h>243</h>
     </coordinates>
-    <panel_attributes>lt=&lt;&lt;&lt;&lt;-</panel_attributes>
-    <additional_attributes>27;27;108;27</additional_attributes>
+    <panel_attributes>ViolenceDetector
+--</panel_attributes>
+    <additional_attributes/>
   </element>
   <element>
     <type>com.umlet.element.Class</type>
@@ -77,13 +53,13 @@ VideoReader</panel_attributes>
   <element>
     <type>com.umlet.element.Relation</type>
     <coordinates>
-      <x>558</x>
-      <y>243</y>
-      <w>89</w>
-      <h>134</h>
+      <x>306</x>
+      <y>324</y>
+      <w>98</w>
+      <h>44</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;&lt;&lt;-</panel_attributes>
-    <additional_attributes>27;117;72;117;72;27;27;27</additional_attributes>
+    <additional_attributes>27;27;81;27</additional_attributes>
   </element>
   <element>
     <type>com.umlet.element.Relation</type>
@@ -111,26 +87,50 @@ LearningKernel - Encapsulates machine learning algorithms.</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
+    <type>com.umlet.element.Relation</type>
+    <coordinates>
+      <x>558</x>
+      <y>432</y>
+      <w>125</w>
+      <h>44</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;&lt;&lt;-</panel_attributes>
+    <additional_attributes>27;27;108;27</additional_attributes>
+  </element>
+  <element>
     <type>com.umlet.element.Class</type>
     <coordinates>
-      <x>666</x>
-      <y>378</y>
-      <w>135</w>
-      <h>45</h>
+      <x>387</x>
+      <y>324</y>
+      <w>198</w>
+      <h>153</h>
     </coordinates>
-    <panel_attributes>EJDBStore
---</panel_attributes>
+    <panel_attributes>ViolenceModel
+--
+extractFeatures(VideoReader)
+</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <type>com.umlet.element.Relation</type>
     <coordinates>
       <x>306</x>
-      <y>324</y>
+      <y>243</y>
       <w>98</w>
       <h>44</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;&lt;&lt;-</panel_attributes>
     <additional_attributes>27;27;81;27</additional_attributes>
+  </element>
+  <element>
+    <type>com.umlet.element.Relation</type>
+    <coordinates>
+      <x>558</x>
+      <y>243</y>
+      <w>89</w>
+      <h>134</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;&lt;&lt;-</panel_attributes>
+    <additional_attributes>27;117;72;117;72;27;27;27</additional_attributes>
   </element>
 </diagram>
