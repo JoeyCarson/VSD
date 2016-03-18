@@ -9,18 +9,27 @@
 #define VIOLENCEMODEL_H_
 
 #include <string>
-#include <opencv2/opencv.hpp>
 
+struct EJDB;
+
+/**
+ * The ViolenceModel class encapsulates the feature extraction operations of
+ * Gracia's algorithm.  It should persist all relevant feature data in an EJDB database.
+ */
 class ViolenceModel {
 
 public:
-	ViolenceModel(std::string filename);
-	std::string fileName();
+	ViolenceModel();
 	virtual ~ViolenceModel();
 
+	// Index the resource in the file system represented by resourcePath.
+	// This path should be compliant for constructing a cv::VideoCapture object.
+	void index(std::string resourcePath);
+
 private:
-	std::string  m_fileName;
-	cv::VideoCapture m_videoCap;
+	EJDB * ejdb;
+
+	void ejdbInit();
 
 
 };

@@ -4,20 +4,32 @@
   <element>
     <type>com.umlet.element.Class</type>
     <coordinates>
-      <x>666</x>
-      <y>432</y>
+      <x>576</x>
+      <y>459</y>
       <w>135</w>
-      <h>54</h>
+      <h>45</h>
     </coordinates>
     <panel_attributes>LearningKernel
---</panel_attributes>
+--
+cv::RandomTrees</panel_attributes>
     <additional_attributes/>
+  </element>
+  <element>
+    <type>com.umlet.element.Relation</type>
+    <coordinates>
+      <x>477</x>
+      <y>189</y>
+      <w>296</w>
+      <h>314</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;&lt;&lt;-</panel_attributes>
+    <additional_attributes>234;297;279;297;279;27;27;27</additional_attributes>
   </element>
   <element>
     <type>com.umlet.element.Class</type>
     <coordinates>
-      <x>666</x>
-      <y>378</y>
+      <x>576</x>
+      <y>396</y>
       <w>135</w>
       <h>45</h>
     </coordinates>
@@ -28,33 +40,60 @@
   <element>
     <type>com.umlet.element.Class</type>
     <coordinates>
-      <x>180</x>
-      <y>180</y>
+      <x>306</x>
+      <y>171</y>
+      <w>198</w>
+      <h>117</h>
+    </coordinates>
+    <panel_attributes>OpenCV
+--
+VideoReader
+RandomTrees</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <type>com.umlet.element.Relation</type>
+    <coordinates>
+      <x>477</x>
+      <y>450</y>
+      <w>116</w>
+      <h>44</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;&lt;&lt;-</panel_attributes>
+    <additional_attributes>27;27;99;27</additional_attributes>
+  </element>
+  <element>
+    <type>com.umlet.element.Class</type>
+    <coordinates>
+      <x>306</x>
+      <y>342</y>
+      <w>198</w>
+      <h>153</h>
+    </coordinates>
+    <panel_attributes>ViolenceModel
+--
+
+index(cv::VideoCapture)
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <type>com.umlet.element.Class</type>
+    <coordinates>
+      <x>99</x>
+      <y>171</y>
       <w>153</w>
-      <h>243</h>
+      <h>324</h>
     </coordinates>
     <panel_attributes>ViolenceDetector
 --</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
-    <type>com.umlet.element.Class</type>
-    <coordinates>
-      <x>387</x>
-      <y>198</y>
-      <w>198</w>
-      <h>117</h>
-    </coordinates>
-    <panel_attributes>OpenCV
---
-VideoReader</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
     <type>com.umlet.element.Relation</type>
     <coordinates>
-      <x>306</x>
-      <y>324</y>
+      <x>225</x>
+      <y>342</y>
       <w>98</w>
       <h>44</h>
     </coordinates>
@@ -64,19 +103,19 @@ VideoReader</panel_attributes>
   <element>
     <type>com.umlet.element.Relation</type>
     <coordinates>
-      <x>558</x>
-      <y>369</y>
-      <w>125</w>
+      <x>477</x>
+      <y>387</y>
+      <w>116</w>
       <h>44</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;&lt;&lt;-</panel_attributes>
-    <additional_attributes>27;27;108;27</additional_attributes>
+    <additional_attributes>27;27;99;27</additional_attributes>
   </element>
   <element>
     <type>com.umlet.element.Note</type>
     <coordinates>
-      <x>180</x>
-      <y>81</y>
+      <x>99</x>
+      <y>72</y>
       <w>459</w>
       <h>81</h>
     </coordinates>
@@ -89,33 +128,8 @@ LearningKernel - Encapsulates machine learning algorithms.</panel_attributes>
   <element>
     <type>com.umlet.element.Relation</type>
     <coordinates>
-      <x>558</x>
-      <y>432</y>
-      <w>125</w>
-      <h>44</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;&lt;&lt;&lt;-</panel_attributes>
-    <additional_attributes>27;27;108;27</additional_attributes>
-  </element>
-  <element>
-    <type>com.umlet.element.Class</type>
-    <coordinates>
-      <x>387</x>
-      <y>324</y>
-      <w>198</w>
-      <h>153</h>
-    </coordinates>
-    <panel_attributes>ViolenceModel
---
-extractFeatures(VideoReader)
-</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <type>com.umlet.element.Relation</type>
-    <coordinates>
-      <x>306</x>
-      <y>243</y>
+      <x>225</x>
+      <y>216</y>
       <w>98</w>
       <h>44</h>
     </coordinates>
@@ -125,12 +139,12 @@ extractFeatures(VideoReader)
   <element>
     <type>com.umlet.element.Relation</type>
     <coordinates>
-      <x>558</x>
-      <y>243</y>
+      <x>477</x>
+      <y>216</y>
       <w>89</w>
-      <h>134</h>
+      <h>179</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;&lt;&lt;-</panel_attributes>
-    <additional_attributes>27;117;72;117;72;27;27;27</additional_attributes>
+    <additional_attributes>27;162;72;162;72;27;27;27</additional_attributes>
   </element>
 </diagram>

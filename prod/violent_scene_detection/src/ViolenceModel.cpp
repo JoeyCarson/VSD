@@ -6,19 +6,39 @@
  */
 
 #include "ViolenceModel.h"
+#include <ejdb/ejdb.h>
 #include "opencv2/opencv.hpp"
 
-ViolenceModel::ViolenceModel(std::string filename)
-:m_fileName(filename),
- m_videoCap(m_fileName)
+#define VIOLENCE_MODEL_DB_NAME "violence_model.db"
+
+ViolenceModel::ViolenceModel()
+: ejdb(NULL)
 {
-	std::cout << "ViolenceModel: fileName:" << fileName() << " isOpened: " << m_videoCap.isOpened();
+	ejdbInit();
 }
 
-std::string ViolenceModel::fileName()
+void ViolenceModel::ejdbInit()
 {
-	return m_fileName;
+	EJDB * tempEJDBPtr = NULL;
+
+	if ( !ejdb ) {
+
+		tempEJDBPtr = ejdbnew();
+
+		if ( !tempEJDBPtr ) {
+			std::cerr << "Failed Instantiating EJDB object.";
+		} else if ( !ejdbopen(tempEJDBPtr, VIOLENCE_MODEL_DB_NAME, JBOWRITER | JBOCREAT) ) {
+			std::cerr << "Failed opening EJDB database.";
+			free(tempEJDBPtr); tempEJDBPtr = NULL;
+		} else {
+			// Success.
+			std::cout << "Database opened.";
+			this->ejdb = tempEJDBPtr;
+		}
+	}
 }
+
+
 
 ViolenceModel::~ViolenceModel() {
 	// TODO Auto-generated destructor stub

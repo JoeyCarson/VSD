@@ -9,9 +9,9 @@ int testEJDB();
 
 int main() {
 
-	ViolenceModel vm("video/fi473_xvid.avi");
+	ViolenceModel vm;
 
-	//testEJDB();
+	testEJDB();
 
     return 0;
 }
@@ -19,7 +19,7 @@ int main() {
 int testEJDB()
 {
     jb = ejdbnew();
-    if (!ejdbopen(jb, "addressbook", JBOWRITER | JBOCREAT | JBOTRUNC)) {
+    if (!ejdbopen(jb, "addressbook.db", JBOWRITER | JBOCREAT | JBOTRUNC)) {
     	return 1;
     }
 

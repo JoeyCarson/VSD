@@ -1,7 +1,13 @@
 # Don't include eclipse metadata associated with the project.
 .metadata 
 
+# Ignore OS X directory databases.
+.DS_Store
+
 # Ignore the output directories. 
 Debug
 OSX
 Release
+
+# Ignore test database files.
+test/*.db
