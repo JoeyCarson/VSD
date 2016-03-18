@@ -9,5 +9,5 @@ Debug
 OSX
 Release
 
-# Ignore test database files.
-test/*.db
+# Ignore RemoteSystemsTempFiles
+RemoteSystemsTempFiles
