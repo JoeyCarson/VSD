@@ -11,7 +11,9 @@ int main() {
 
 	ViolenceModel vm;
 
-	testEJDB();
+	vm.index("output.mp4");
+
+	//testEJDB();
 
     return 0;
 }

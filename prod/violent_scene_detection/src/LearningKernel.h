@@ -8,7 +8,8 @@
 #ifndef LEARNINGKERNEL_H_
 #define LEARNINGKERNEL_H_
 
-#include <opencv2/opencv.hpp>
+#include <opencv2/ml.hpp>
+//#include <opencv2/opencv.hpp>
 
 /**
  * Implements the Random Forests algorithm as proprosed by Gracia.
@@ -22,7 +23,7 @@ public:
 	virtual ~LearningKernel();
 
 private:
-	cv::RandomTrees randomForest;
+	//cv::ml::RTrees randomForest;
 
 };
 
