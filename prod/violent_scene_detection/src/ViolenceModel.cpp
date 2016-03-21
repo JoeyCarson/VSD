@@ -87,14 +87,23 @@ void ViolenceModel::index(std::string resourcePath)
 		cv::absdiff(prevFrame, currentFrame, absDiff);
 		cv::threshold ( absDiff, binAbsDiff, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU );
 
-		//std::cout << "blah: " << binAbsDiff;
-
 		// Output binAbsDiff for debug purposes.
 		boost::filesystem::path bpath(resourcePath);
 		std::stringstream frameName;
-		frameName << bpath.stem().string() << "_" << i;
+		frameName << "abs_bin_diff_" << bpath.stem().string() << "_" << i;
 
 		ImageUtil::dumpDebugImage(binAbsDiff, frameName.str());
+
+		// Find the contours (blobs) and use them to compute centroids, area, etc.
+		// http://opencv.itseez.com/2.4/doc/tutorials/imgproc/shapedescriptors/moments/moments.html?highlight=moment#code
+		std::vector<std::vector<cv::Point>> contours;
+		std::vector<cv::Vec4i> hierarchy;
+		cv::findContours(binAbsDiff, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+
+		for ( int j = 0; j < contours.size(); j++ ) {
+			std::vector<cv::Point> c = contours[j];
+			ImageUtil::printContour(c);
+		}
 	}
 
 }

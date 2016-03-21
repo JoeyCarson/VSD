@@ -31,7 +31,6 @@ private:
 
 	void ejdbInit();
 
-
 };
 
 #endif /* VIOLENCEMODEL_H_ */

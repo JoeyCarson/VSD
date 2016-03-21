@@ -63,3 +63,16 @@ void ImageUtil::createDebugDirectory()
 		return;
 	}
 }
+
+void ImageUtil::printContour(std::vector<cv::Point> c)
+{
+	std::stringstream contourStr;
+	contourStr << "contour: ";
+
+	for ( int p = 0; p < c.size(); p++) {
+		cv::Point pt = c[p];
+		contourStr << "( " << pt.x << ", " << pt.y << " ) ";
+	}
+
+	std::cout << contourStr.str() << "\n";
+}
