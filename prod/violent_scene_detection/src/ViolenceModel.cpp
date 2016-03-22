@@ -14,6 +14,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/foreach.hpp>
 
 //#include <opencv/cv.h>
 //#include <opencv2/videoio.hpp>
@@ -53,18 +54,16 @@ void ViolenceModel::index(std::string resourcePath)
 {
 	// Create a VideoCapture instance bound to the path.
 	cv::VideoCapture capture(resourcePath);
-
-	// Load the prev frame with the first frame and current with the second
-	// so that we can simply loop and compute.
 	cv::Mat currentFrame, prevFrame;
 
 	bool capPrevSuccess = false;
 	bool capCurrSuccess = false;
 
+	// Load the prev frame with the first frame and current with the second
+	// so that we can simply loop and compute.
 	for ( uint i = 0, capPrevSuccess = capture.read(prevFrame), capCurrSuccess = capture.read(currentFrame);
 		  capPrevSuccess && capCurrSuccess;
-		  prevFrame = currentFrame, capCurrSuccess = capture.read(currentFrame), i++
-	    )
+		  prevFrame = currentFrame, capCurrSuccess = capture.read(currentFrame), i++ )
 	{
 		std::cout<< "frame: " << i << "\n";
 
@@ -90,8 +89,7 @@ void ViolenceModel::index(std::string resourcePath)
 		// Output binAbsDiff for debug purposes.
 		boost::filesystem::path bpath(resourcePath);
 		std::stringstream frameName;
-		frameName << "abs_bin_diff_" << bpath.stem().string() << "_" << i;
-
+		frameName << "bin_abs_diff_" << bpath.stem().string() << "_" << i;
 		ImageUtil::dumpDebugImage(binAbsDiff, frameName.str());
 
 		// Find the contours (blobs) and use them to compute centroids, area, etc.
@@ -100,9 +98,27 @@ void ViolenceModel::index(std::string resourcePath)
 		std::vector<cv::Vec4i> hierarchy;
 		cv::findContours(binAbsDiff, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
 
-		for ( int j = 0; j < contours.size(); j++ ) {
-			std::vector<cv::Point> c = contours[j];
-			ImageUtil::printContour(c);
+		// Extract the centroids, areas, and
+		std::vector<cv::Point2f> blobCentroids(contours.size());
+		std::vector<double> blobAreas(contours.size());
+		uint contourIndex = 0;
+		BOOST_FOREACH(std::vector<cv::Point> cont, contours)
+		{
+			cv::Moments mts = cv::moments(cont);
+
+			// Contours that intersect one another may yield a zero area (m00) for butterfly-shaped contours.
+			// All fields in Moments object end up being 0.  Does this mean that we shouldn't include them?
+			// http://docs.opencv.org/2.4/modules/imgproc/doc/structural_analysis_and_shape_descriptors.html?highlight=moments#moments
+			cv::Point2f centroid = mts.m00 > 0 ? cv::Point2f( mts.m10/mts.m00, mts.m01/mts.m00 ) : cv::Point2f(0,0);
+			double area = cv::contourArea(cont, false);
+
+			std::stringstream contourName; contourName << contourIndex++;
+			ImageUtil::printContour(cont, contourName.str());
+			std::cout << "area: " << area << "\n";
+			std::cout << "centroid: x:" << centroid.x << " y: " << centroid.y << "\n";
+
+			blobCentroids.push_back(centroid);
+			blobAreas.push_back(area);
 		}
 	}
 

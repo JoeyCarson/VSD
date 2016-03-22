@@ -11,6 +11,8 @@
 #include <sstream>
 #include "ImageUtil.h"
 
+#include <boost/foreach.hpp>
+
 #define DEBUG_OUTPUT_DIR "./debug"
 
 void ImageUtil::dumpDebugImage(cv::Mat image, std::string outputFileName)
@@ -20,8 +22,6 @@ void ImageUtil::dumpDebugImage(cv::Mat image, std::string outputFileName)
 		ImageUtil::createDebugDirectory();
 		firstCall = false;
 	}
-
-	//std::cout << "asdasd " << frameName.str() << "\n";
 
 	std::stringstream outFilePathStreamBase;
 	outFilePathStreamBase << DEBUG_OUTPUT_DIR << "/" << outputFileName;
@@ -64,15 +64,9 @@ void ImageUtil::createDebugDirectory()
 	}
 }
 
-void ImageUtil::printContour(std::vector<cv::Point> c)
+void ImageUtil::printContour(std::vector<cv::Point> c, std::string name)
 {
 	std::stringstream contourStr;
-	contourStr << "contour: ";
-
-	for ( int p = 0; p < c.size(); p++) {
-		cv::Point pt = c[p];
-		contourStr << "( " << pt.x << ", " << pt.y << " ) ";
-	}
-
-	std::cout << contourStr.str() << "\n";
+	BOOST_FOREACH(cv::Point pt, c) { contourStr << "( " << pt.x << ", " << pt.y << " ) "; }
+	std::cout << "contour "  << name << ": " << contourStr.str() << "\n";
 }

@@ -17,7 +17,7 @@ public:
 	// Writes the given matrix into the debug output directory.
 	static void dumpDebugImage(cv::Mat image, std::string outputFileName);
 	static void createDebugDirectory();
-	static void printContour(std::vector<cv::Point> c);
+	static void printContour(std::vector<cv::Point> c, std::string name = "");
 	//ImageUtil();
 	//virtual ~ImageUtil();
 };
