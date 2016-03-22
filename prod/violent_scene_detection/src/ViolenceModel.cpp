@@ -98,10 +98,12 @@ void ViolenceModel::index(std::string resourcePath)
 		std::vector<cv::Vec4i> hierarchy;
 		cv::findContours(binAbsDiff, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
 
-		// Extract the centroids, areas, and
+		// Extract the centroids, areas, and compactness.
+		uint contourIndex = 0;
 		std::vector<cv::Point2f> blobCentroids(contours.size());
 		std::vector<double> blobAreas(contours.size());
-		uint contourIndex = 0;
+		std::vector<double> blobCompactness(contours.size());
+
 		BOOST_FOREACH(std::vector<cv::Point> cont, contours)
 		{
 			cv::Moments mts = cv::moments(cont);
@@ -111,14 +113,17 @@ void ViolenceModel::index(std::string resourcePath)
 			// http://docs.opencv.org/2.4/modules/imgproc/doc/structural_analysis_and_shape_descriptors.html?highlight=moments#moments
 			cv::Point2f centroid = mts.m00 > 0 ? cv::Point2f( mts.m10/mts.m00, mts.m01/mts.m00 ) : cv::Point2f(0,0);
 			double area = cv::contourArea(cont, false);
+			double compactness = pow(cv::arcLength(cont, true), 2) / (4 * M_PI * area);
 
 			std::stringstream contourName; contourName << contourIndex++;
 			ImageUtil::printContour(cont, contourName.str());
 			std::cout << "area: " << area << "\n";
 			std::cout << "centroid: x:" << centroid.x << " y: " << centroid.y << "\n";
+			std::cout << "compactness: " << compactness;
 
 			blobCentroids.push_back(centroid);
 			blobAreas.push_back(area);
+			blobCompactness.push_back(compactness);
 		}
 	}
 
