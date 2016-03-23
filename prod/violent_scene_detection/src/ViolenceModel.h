@@ -8,6 +8,8 @@
 #ifndef VIOLENCEMODEL_H_
 #define VIOLENCEMODEL_H_
 
+#include <opencv2/opencv.hpp>
+#include <boost/bimap.hpp>
 #include <string>
 
 struct EJDB;
@@ -19,7 +21,7 @@ struct EJDB;
 class ViolenceModel {
 
 public:
-	ViolenceModel();
+	ViolenceModel(std::string trainingStorePath = "./default_training_set.xml");
 	virtual ~ViolenceModel();
 
 	// Index the resource in the file system represented by resourcePath.
@@ -28,7 +30,10 @@ public:
 
 private:
 	EJDB * ejdb;
+	std::string trainingStorePath;
+	cv::Mat trainingStore;
 
+	void trainingStoreInit();
 	void ejdbInit();
 
 };

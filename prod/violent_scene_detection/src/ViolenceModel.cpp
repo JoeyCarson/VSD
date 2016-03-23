@@ -22,11 +22,27 @@
 
 
 #define VIOLENCE_MODEL_DB_NAME "violence_model.db"
+#define VIOLENCE_MODEL_TRAINING_SET "violence_model_train"
 
-ViolenceModel::ViolenceModel()
-: ejdb(NULL)
+ViolenceModel::ViolenceModel(std::string trainingStorePath)
+: ejdb(NULL),
+  trainingStorePath(trainingStorePath)
 {
 	ejdbInit();
+	trainingStoreInit();
+}
+
+void ViolenceModel::trainingStoreInit()
+{
+	cv::FileStorage file;
+	bool trainingStoreOpenSuccess = file.open(trainingStorePath, cv::FileStorage::READ | cv::FileStorage::WRITE);
+	if (!trainingStoreOpenSuccess) {
+		std::cout << "Failed opening training store at " << this->trainingStorePath << "\n";
+		return;
+	}
+
+	file[VIOLENCE_MODEL_TRAINING_SET] >> trainingStore;
+	std::cout << "trainingStore is " << trainingStore << "\n";
 }
 
 void ViolenceModel::ejdbInit()
@@ -98,12 +114,17 @@ void ViolenceModel::index(std::string resourcePath)
 		std::vector<cv::Vec4i> hierarchy;
 		cv::findContours(binAbsDiff, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
 
-		// Extract the centroids, areas, and compactness.
+		// Extract the centroid, area, and compactness.
 		uint contourIndex = 0;
 		std::vector<cv::Point2f> blobCentroids(contours.size());
 		std::vector<double> blobAreas(contours.size());
 		std::vector<double> blobCompactness(contours.size());
 
+		// TODO: At the moment we're just reading these values into local variables.  The intention is to store them
+		// in a class member that can store it in a format that is both efficient for learning model computation and
+		// persistent store in the file system (so that the arduous process of extracting the features isn't necessary
+		// every single time.
+		// See http://www.boost.org/doc/libs/1_39_0/libs/bimap/doc/html/boost_bimap/one_minute_tutorial.html
 		BOOST_FOREACH(std::vector<cv::Point> cont, contours)
 		{
 			cv::Moments mts = cv::moments(cont);
@@ -113,13 +134,13 @@ void ViolenceModel::index(std::string resourcePath)
 			// http://docs.opencv.org/2.4/modules/imgproc/doc/structural_analysis_and_shape_descriptors.html?highlight=moments#moments
 			cv::Point2f centroid = mts.m00 > 0 ? cv::Point2f( mts.m10/mts.m00, mts.m01/mts.m00 ) : cv::Point2f(0,0);
 			double area = cv::contourArea(cont, false);
-			double compactness = pow(cv::arcLength(cont, true), 2) / (4 * M_PI * area);
+			double compactness = area > 0 ? pow(cv::arcLength(cont, true), 2) / (4 * M_PI * area) : 0;
 
 			std::stringstream contourName; contourName << contourIndex++;
-			ImageUtil::printContour(cont, contourName.str());
+			//ImageUtil::printContour(cont, contourName.str());
 			std::cout << "area: " << area << "\n";
 			std::cout << "centroid: x:" << centroid.x << " y: " << centroid.y << "\n";
-			std::cout << "compactness: " << compactness;
+			std::cout << "compactness: " << compactness << "\n";
 
 			blobCentroids.push_back(centroid);
 			blobAreas.push_back(area);
