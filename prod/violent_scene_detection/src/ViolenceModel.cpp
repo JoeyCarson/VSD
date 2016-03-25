@@ -176,15 +176,21 @@ void ViolenceModel::addTrainingSample(std::vector<cv::Mat> trainingSample)
 	// width (columns) of the training sample.
 	if ( trainingStore.size().width != v1Sample.size().width ) {
 		std::cout << "updating training store size. current: " << trainingStore.size() <<"\n";
+		// Create the training store with 0 rows of the training sample's width (column count).
 		trainingStore.create(0, v1Sample.size().width, CV_32F);
 		std::cout << "new training store size " << v1Sample.size() << "\n";
 	}
 
+	// Add it to the training store.
 	trainingStore.push_back(v1Sample);
 	std::cout<<"training store size after add: " << trainingStore.size() << "\n";
+
+	// Save the training store.
+	persistTrainingStore();
 }
 
-ViolenceModel::~ViolenceModel() {
+void ViolenceModel::persistTrainingStore()
+{
 	cv::FileStorage file;
 
 	// Open the training store file for write and write it.
@@ -194,6 +200,12 @@ ViolenceModel::~ViolenceModel() {
 		return;
 	}
 
+	std::cout << "persisting training store" << "\n";
 	file << VIOLENCE_MODEL_TRAINING_SET << trainingStore;
+}
+
+ViolenceModel::~ViolenceModel() {
+	// Be sure to save the training store when the model is destroyed.
+	persistTrainingStore();
 }
 

@@ -57,6 +57,12 @@ private:
 	 * training store.
 	 */
 	void addTrainingSample(std::vector<cv::Mat> trainingSample);
+
+
+	/**
+	 * Saves the training store to its file path.
+	 */
+	void persistTrainingStore();
 };
 
 #endif /* VIOLENCEMODEL_H_ */
