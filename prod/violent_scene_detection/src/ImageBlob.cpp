@@ -61,7 +61,7 @@ float ImageBlob::distanceFrom(const ImageBlob &other)
 	float dY = centroidOther.y - centroidThis.y;
 	float d  = sqrt(pow(dX,2) + pow(dY,2));
 
-	std::cout << "distance: " << d << "\n";
+	//std::cout << "distance: " << d << "\n";
 
 	return d;
 }

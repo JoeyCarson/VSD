@@ -45,7 +45,7 @@ private:
 	 */
 	std::vector<cv::Mat> buildTrainingSample(std::vector<ImageBlob> blobs);
 
-	void addTrainingSample(cv::Mat trainingSample);
+	void addTrainingSample(std::vector<cv::Mat> trainingSample);
 
 };
 
