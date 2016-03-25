@@ -12,6 +12,8 @@
 #include <boost/bimap.hpp>
 #include <string>
 
+class ImageBlob;
+
 struct EJDB;
 
 /**
@@ -35,6 +37,15 @@ private:
 
 	void trainingStoreInit();
 	void ejdbInit();
+
+	/**
+	 * Builds a training sample based on the number of given image blobs.
+	 * Returns a vector of training samples generated for each version of Gracia's
+	 * algorithm, e.g. [0] is suitable for training v1, [2] suitable for training v2.
+	 */
+	std::vector<cv::Mat> buildTrainingSample(std::vector<ImageBlob> blobs);
+
+	void addTrainingSample(cv::Mat trainingSample);
 
 };
 

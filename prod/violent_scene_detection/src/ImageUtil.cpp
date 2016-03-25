@@ -29,14 +29,16 @@ void ImageUtil::dumpDebugImage(cv::Mat image, std::string outputFileName)
 	// Write the OpenCV matrix itself.
 	std::stringstream outMatFilePathStream;
 	outMatFilePathStream << outFilePathStreamBase.str()  << ".xml";
-	std::cout << "adasda: " << outMatFilePathStream.str() << "\n";
+	//std::cout << "mat: " << outMatFilePathStream.str() << "\n";
+
 	cv::FileStorage file(outMatFilePathStream.str(), cv::FileStorage::WRITE);
 	file << outputFileName.c_str() << image;
 	file.release();
 
 	std::stringstream outImageFileName;
 	outImageFileName << outFilePathStreamBase.str() << ".png";
-	std::cout << "out image name: " << outImageFileName.str() << "\n";
+	//std::cout << "out image name: " << outImageFileName.str() << "\n";
+
 	if ( !cv::imwrite(outImageFileName.str().c_str(), image) ) {
 		std::cout << "failed to write debug image file." << "\n";
 	}

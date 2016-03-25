@@ -5,6 +5,7 @@
  *      Author: josephcarson
  */
 
+#include <cassert>
 #include <iostream>
 #include <unistd.h>
 #include <ejdb/ejdb.h>
@@ -90,8 +91,6 @@ void ViolenceModel::index(std::string resourcePath)
 		  capPrevSuccess && capCurrSuccess;
 		  prevFrame = currentFrame, capCurrSuccess = capture.read(currentFrame), i++ )
 	{
-		std::cout<< "frame: " << i << "\n";
-
 		// Convert to grayscale.
 		if ( i == 0 ) {
 			cv::Mat grayOut;
@@ -132,7 +131,7 @@ void ViolenceModel::index(std::string resourcePath)
 		{
 			ImageBlob blob(cont);
 
-			std::cout << "blob: " << blob << "\n";
+			//std::cout << "blob: " << blob << "\n";
 
 			if ( topBlobsHeap.size() < GRACIA_K ) {
 				// The heap isn't full yet, we can simply keep adding.
@@ -144,6 +143,64 @@ void ViolenceModel::index(std::string resourcePath)
 			}
 		}
 	}
+
+	// Read the ordered blobs back as an ordered list.
+	std::vector<ImageBlob> blobs;
+	while ( !topBlobsHeap.empty() ) {
+		blobs.push_back( topBlobsHeap.top() );
+		topBlobsHeap.pop();
+	}
+
+	std::vector<cv::Mat> trainingSample = buildTrainingSample(blobs);
+
+	// Add the sample to the matrix.
+	//addTrainingSample(blobs);
+}
+
+std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> blobs)
+{
+	assert(blobs.size() == GRACIA_K);
+	std::vector<cv::Mat> retVect;
+
+	// Build v1 sample based on the given blobs.
+	//const uint columnCount = 3 * GRACIA_K + (GRACIA_K * (GRACIA_K - 1)/2);
+	std::vector<float> v1ExampleVec;//(columnCount);
+
+	for ( uint i = 0; i < blobs.size(); i++ ) {
+		ImageBlob bi = blobs[i];
+
+		// Add the area.
+		v1ExampleVec.push_back( (float)bi.area() );
+
+		// Centroid x and y.
+		v1ExampleVec.push_back( bi.centroid().x );
+		v1ExampleVec.push_back( bi.centroid().y );
+
+		// Compute the differences from this blob and all others that
+		// are not this blob.
+		for ( uint j = 0; j < blobs.size(); j++ ) {
+			if ( i != j ) {
+				ImageBlob bj = blobs[j];
+				v1ExampleVec.push_back( bi.distanceFrom(bj) );
+			}
+		}
+	}
+
+	cv::Mat exampleMat(v1ExampleVec);
+	exampleMat.t();
+
+	std::cout << "example: " << exampleMat.size() << "\n";
+
+	retVect.push_back( exampleMat );
+
+	return retVect;
+}
+
+void ViolenceModel::addTrainingSample(cv::Mat trainingSample)
+{
+//	for ( auto b : blobs ) {
+//		std::cout<<"addTrainingSample "<< b <<"\n";
+//	}
 }
 
 ViolenceModel::~ViolenceModel() {

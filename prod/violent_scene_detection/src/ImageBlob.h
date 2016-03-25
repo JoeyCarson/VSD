@@ -16,11 +16,13 @@
  * for computing properties about them.
  */
 class ImageBlob {
+
 public:
 	/**
 	 * Constructor.
 	 * @param points - A vector of the pixel coordinates that describes the contour of the blob.
 	 */
+	//ImageBlob(const ImageBlob &ref);
 	ImageBlob(std::vector<cv::Point> points);
 	virtual ~ImageBlob();
 
@@ -29,10 +31,19 @@ public:
 
 	// Retrieves a copy of the points.
 	std::vector<cv::Point> points() const;
+
+	// Compute and return the centroid.
 	cv::Point2f centroid() const;
+
+	// Compute and return compactness.
 	double compactness();
+
+	// Compute and return area.
 	double area() const;
 
+	// Compute the Euclidian distance from the centroid of the
+	// given ImageBlob to the centroid of this image blob.
+	float distanceFrom(const ImageBlob &other);
 
 private:
 	std::vector<cv::Point> m_points;

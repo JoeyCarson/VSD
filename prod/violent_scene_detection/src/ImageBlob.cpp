@@ -7,6 +7,12 @@
 
 #include "ImageBlob.h"
 
+
+//ImageBlob::ImageBlob(const ImageBlob &ref)
+//{
+//	this->m_points = ref.points();
+//}
+
 ImageBlob::ImageBlob(std::vector<cv::Point> points)
 : m_points(points)
 {
@@ -44,6 +50,20 @@ bool ImageBlob::operator < (const ImageBlob &bRight) const
 	double thisArea = this->area();
 	double rightArea = bRight.area();
 	return thisArea < rightArea;
+}
+
+float ImageBlob::distanceFrom(const ImageBlob &other)
+{
+	cv::Point2f centroidOther = other.centroid();
+	cv::Point2f centroidThis = this->centroid();
+
+	float dX = centroidOther.x - centroidThis.x;
+	float dY = centroidOther.y - centroidThis.y;
+	float d  = sqrt(pow(dX,2) + pow(dY,2));
+
+	std::cout << "distance: " << d << "\n";
+
+	return d;
 }
 
 std::ostream& operator<< (std::ostream &strm, const ImageBlob &a)
