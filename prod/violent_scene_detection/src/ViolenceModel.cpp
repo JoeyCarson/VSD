@@ -172,9 +172,11 @@ void ViolenceModel::addTrainingSample(std::vector<cv::Mat> trainingSample)
 {
 	cv::Mat v1Sample = trainingSample[0];
 	// OpenCV size is as follows.  [width (columns), height (rows)].
+	// We effectively want to resize the matrix according to the
+	// width (columns) of the training sample.
 	if ( trainingStore.size().width != v1Sample.size().width ) {
 		std::cout << "updating training store size. current: " << trainingStore.size() <<"\n";
-		trainingStore.create(v1Sample.size(), CV_32F);
+		trainingStore.create(0, v1Sample.size().width, CV_32F);
 		std::cout << "new training store size " << v1Sample.size() << "\n";
 	}
 
