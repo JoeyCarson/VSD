@@ -29,10 +29,8 @@
 const uint GRACIA_K = 8;
 
 ViolenceModel::ViolenceModel(std::string trainingStorePath)
-: ejdb(NULL),
-  trainingStorePath(trainingStorePath)
+: trainingStorePath(trainingStorePath)
 {
-	ejdbInit();
 	trainingStoreInit();
 }
 
@@ -46,31 +44,8 @@ void ViolenceModel::trainingStoreInit()
 	}
 
 	file[VIOLENCE_MODEL_TRAINING_SET] >> trainingStore;
-	std::cout << "trainingStore is " << trainingStore << "\n";
+	std::cout << "trainingStore loaded. size: " << trainingStore.size() << "\n";
 }
-
-void ViolenceModel::ejdbInit()
-{
-	EJDB * tempEJDBPtr = NULL;
-
-	if ( !ejdb ) {
-
-		tempEJDBPtr = ejdbnew();
-
-		if ( !tempEJDBPtr ) {
-			std::cerr << "Failed Instantiating EJDB object.";
-		} else if ( !ejdbopen(tempEJDBPtr, VIOLENCE_MODEL_DB_NAME, JBOWRITER | JBOCREAT) ) {
-			std::cerr << "Failed opening EJDB database.";
-			free(tempEJDBPtr); tempEJDBPtr = NULL;
-		} else {
-			// Success.
-			std::cout << "Database opened.";
-			this->ejdb = tempEJDBPtr;
-		}
-	}
-}
-
-
 
 void ViolenceModel::index(std::string resourcePath)
 {
@@ -131,8 +106,6 @@ void ViolenceModel::index(std::string resourcePath)
 		{
 			ImageBlob blob(cont);
 
-			//std::cout << "blob: " << blob << "\n";
-
 			if ( topBlobsHeap.size() < GRACIA_K ) {
 				// The heap isn't full yet, we can simply keep adding.
 				topBlobsHeap.emplace(blob);
@@ -151,6 +124,7 @@ void ViolenceModel::index(std::string resourcePath)
 		topBlobsHeap.pop();
 	}
 
+	// Build a single training sample for each algorithm and add it to the store.
 	std::vector<cv::Mat> trainingSample = buildTrainingSample(blobs);
 	addTrainingSample(trainingSample);
 }
@@ -160,16 +134,12 @@ std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> b
 	assert(blobs.size() == GRACIA_K);
 	std::vector<cv::Mat> retVect;
 
-	// Build v1 sample based on the given blobs.
-	//const uint columnCount = 3 * GRACIA_K + (GRACIA_K * (GRACIA_K - 1)/2);
+	// Build v1 sample based on the given blobs as a vector.
 	std::vector<float> v1ExampleVec;
-
-	std::cout << "blobs: "<< blobs.size() << "\n";
-
 	uint featureCount = 0;
 
 	for ( uint i = 0; i < blobs.size(); i++ ) {
-		std::cout<<"i:"<<i<<"\n";
+
 		ImageBlob bi = blobs[i];
 
 		// Add the area.
@@ -179,8 +149,7 @@ std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> b
 		v1ExampleVec.push_back( bi.centroid().x ); featureCount++;
 		v1ExampleVec.push_back( bi.centroid().y ); featureCount++;
 
-		// Compute the differences from this blob and all others that
-		// are not this blob.
+		// Compute the distances of this blob from all other blobs.
 		for ( uint j = 0; j < blobs.size(); j++ ) {
 			if ( i != j ) {
 				ImageBlob bj = blobs[j];
@@ -189,8 +158,12 @@ std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> b
 		}
 	}
 
+	// Create a matrix based on this vector so that it can easily be added
+	// to store as a row.  A cv::Mat created from an std::vector is effectively
+	// a column vector.  We want to eventually store it as a row, so it must
+	// also be transposed before we add it to the output std::vector.
 	cv::Mat example1Mat(v1ExampleVec);
-	retVect.push_back( (example1Mat = example1Mat.t() ) );
+	retVect.push_back( example1Mat = example1Mat.t() );
 
 	return retVect;
 }
@@ -200,9 +173,9 @@ void ViolenceModel::addTrainingSample(std::vector<cv::Mat> trainingSample)
 	cv::Mat v1Sample = trainingSample[0];
 	// OpenCV size is as follows.  [width (columns), height (rows)].
 	if ( trainingStore.size().width != v1Sample.size().width ) {
-		std::cout<<"current training store size: " << trainingStore.size() << " training sample size: " << v1Sample.size() <<"\n";
-		std::cout << "allocating training store with size " << v1Sample.size() << "\n";
+		std::cout << "updating training store size. current: " << trainingStore.size() <<"\n";
 		trainingStore.create(v1Sample.size(), CV_32F);
+		std::cout << "new training store size " << v1Sample.size() << "\n";
 	}
 
 	trainingStore.push_back(v1Sample);
@@ -211,13 +184,14 @@ void ViolenceModel::addTrainingSample(std::vector<cv::Mat> trainingSample)
 
 ViolenceModel::~ViolenceModel() {
 	cv::FileStorage file;
+
+	// Open the training store file for write and write it.
 	bool trainingStoreOpenSuccess = file.open(trainingStorePath, cv::FileStorage::WRITE);
 	if (!trainingStoreOpenSuccess) {
 		std::cout << "Failed opening training store at " << trainingStorePath << "\n";
 		return;
 	}
 
-	std::cout << "";
 	file << VIOLENCE_MODEL_TRAINING_SET << trainingStore;
 }
 

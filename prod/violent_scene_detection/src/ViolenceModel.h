@@ -14,8 +14,6 @@
 
 class ImageBlob;
 
-struct EJDB;
-
 /**
  * The ViolenceModel class encapsulates the feature extraction operations of
  * Gracia's algorithm.  It should persist all relevant feature data in an EJDB database.
@@ -23,7 +21,17 @@ struct EJDB;
 class ViolenceModel {
 
 public:
+
+	/**
+	 * Constructor.
+	 * @param trainingStorePath - Path to where the training database file is stored.
+	 * It will be opened and read in on construction and persisted upon update and destruction.
+	 */
 	ViolenceModel(std::string trainingStorePath = "./default_training_set.xml");
+
+	/**
+	 * Destructor.  Persists the training set database.
+	 */
 	virtual ~ViolenceModel();
 
 	// Index the resource in the file system represented by resourcePath.
@@ -31,22 +39,24 @@ public:
 	void index(std::string resourcePath);
 
 private:
-	EJDB * ejdb;
+
 	std::string trainingStorePath;
 	cv::Mat trainingStore;
 
 	void trainingStoreInit();
-	void ejdbInit();
 
 	/**
 	 * Builds a training sample based on the number of given image blobs.
 	 * Returns a vector of training samples generated for each version of Gracia's
-	 * algorithm, e.g. [0] is suitable for training v1, [2] suitable for training v2.
+	 * algorithm, e.g. [0] is suitable for training v1, [1] is suitable for training v2.
 	 */
 	std::vector<cv::Mat> buildTrainingSample(std::vector<ImageBlob> blobs);
 
+	/**
+	 * Add the training samples for their respective algorithms to their respective
+	 * training store.
+	 */
 	void addTrainingSample(std::vector<cv::Mat> trainingSample);
-
 };
 
 #endif /* VIOLENCEMODEL_H_ */
