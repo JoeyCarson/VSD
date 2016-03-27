@@ -34,6 +34,12 @@ ViolenceModel::ViolenceModel(std::string trainingStorePath)
 	trainingStoreInit();
 }
 
+void ViolenceModel::clear()
+{
+	trainingStore.create(0, 0, CV_32F);
+	persistTrainingStore();
+}
+
 void ViolenceModel::trainingStoreInit()
 {
 	cv::FileStorage file;
@@ -49,6 +55,16 @@ void ViolenceModel::trainingStoreInit()
 
 void ViolenceModel::index(std::string resourcePath)
 {
+	std::vector<cv::Mat> trainingSample = extractFeatures(resourcePath);
+	addTrainingSample(trainingSample);
+}
+
+std::vector<cv::Mat> ViolenceModel::extractFeatures(std::string resourcePath)
+{
+
+	// TODO: Implement a cache lookup mechanism so that we don't retry to do this each time.
+	// 		 Also so that we can avoid adding duplicate video files in the training set.
+
 	// Create a VideoCapture instance bound to the path.
 	cv::VideoCapture capture(resourcePath);
 	cv::Mat currentFrame, prevFrame;
@@ -124,9 +140,15 @@ void ViolenceModel::index(std::string resourcePath)
 		topBlobsHeap.pop();
 	}
 
-	// Build a single training sample for each algorithm and add it to the store.
+	// Build a single training sample for each algorithm.
 	std::vector<cv::Mat> trainingSample = buildTrainingSample(blobs);
-	addTrainingSample(trainingSample);
+	return trainingSample;
+}
+
+void ViolenceModel::train()
+{
+	// Index the training store.
+	learningKernel.train(trainingStore, cv::ml::ROW_SAMPLE);
 }
 
 std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> blobs)
@@ -170,23 +192,26 @@ std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> b
 
 void ViolenceModel::addTrainingSample(std::vector<cv::Mat> trainingSample)
 {
-	cv::Mat v1Sample = trainingSample[0];
-	// OpenCV size is as follows.  [width (columns), height (rows)].
-	// We effectively want to resize the matrix according to the
-	// width (columns) of the training sample.
-	if ( trainingStore.size().width != v1Sample.size().width ) {
-		std::cout << "updating training store size. current: " << trainingStore.size() <<"\n";
-		// Create the training store with 0 rows of the training sample's width (column count).
-		trainingStore.create(0, v1Sample.size().width, CV_32F);
-		std::cout << "new training store size " << v1Sample.size() << "\n";
+	if ( !trainingSample.size() == 1 )
+	{
+		cv::Mat v1Sample = trainingSample[0];
+		// OpenCV size is as follows.  [width (columns), height (rows)].
+		// We effectively want to resize the matrix according to the
+		// width (columns) of the training sample.
+		if ( trainingStore.size().width != v1Sample.size().width ) {
+			std::cout << "updating training store size. current: " << trainingStore.size() <<"\n";
+			// Create the training store with 0 rows of the training sample's width (column count).
+			trainingStore.create(0, v1Sample.size().width, CV_32F);
+			std::cout << "new training store size " << v1Sample.size() << "\n";
+		}
+
+		// Add it to the training store.
+		trainingStore.push_back(v1Sample);
+		std::cout<<"training store size after add: " << trainingStore.size() << "\n";
+
+		// Save the training store.
+		persistTrainingStore();
 	}
-
-	// Add it to the training store.
-	trainingStore.push_back(v1Sample);
-	std::cout<<"training store size after add: " << trainingStore.size() << "\n";
-
-	// Save the training store.
-	persistTrainingStore();
 }
 
 void ViolenceModel::persistTrainingStore()
@@ -208,4 +233,3 @@ ViolenceModel::~ViolenceModel() {
 	// Be sure to save the training store when the model is destroyed.
 	persistTrainingStore();
 }
-

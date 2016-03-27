@@ -8,6 +8,8 @@
 #ifndef VIOLENCEMODEL_H_
 #define VIOLENCEMODEL_H_
 
+#include "LearningKernel.h"
+
 #include <opencv2/opencv.hpp>
 #include <boost/bimap.hpp>
 #include <string>
@@ -34,14 +36,39 @@ public:
 	 */
 	virtual ~ViolenceModel();
 
-	// Index the resource in the file system represented by resourcePath.
-	// This path should be compliant for constructing a cv::VideoCapture object.
+	/**
+	 * Extracts features and returns a list of training vectors, one for each version of the algorithm.
+	 * This path must be compliant for constructing a cv::VideoCapture object (e.g. points to a
+	 * video file that contains a supported codec video stream).
+	 */
+	std::vector<cv::Mat> extractFeatures(std::string resourcePath);
+
+	/**
+	 * Index the resource in the file system represented by resourcePath into the training store.
+	 * This method extracts the feature vector and adds it to the training set.
+	 */
 	void index(std::string resourcePath);
+
+	/**
+	 * Trains the learning model using the existing indexed training set.
+	 */
+	void train();
+
+	/**
+	 *
+	 */
+	void predict();
+
+	/**
+	 * Clear the training store.
+	 */
+	void clear();
 
 private:
 
 	std::string trainingStorePath;
 	cv::Mat trainingStore;
+	LearningKernel learningKernel;
 
 	void trainingStoreInit();
 
@@ -57,7 +84,6 @@ private:
 	 * training store.
 	 */
 	void addTrainingSample(std::vector<cv::Mat> trainingSample);
-
 
 	/**
 	 * Saves the training store to its file path.
