@@ -17,22 +17,30 @@ LearningKernel::LearningKernel()
 
 void LearningKernel::initRandomTrees()
 {
-	m_pTrees->setMaxDepth(200);
-	m_pTrees->setMinSampleCount(400);
+	m_pTrees->setMaxDepth(1);
+	m_pTrees->setMinSampleCount(1);
+
+	//cv::ml::TermCriteria c;
+	cv::TermCriteria criteria(cv::TermCriteria::EPS, 0, 0);
+	m_pTrees->setTermCriteria(criteria);
+	m_pTrees->setCalculateVarImportance(false);
+
+	// This is a binary classifier (max of 2 classes).
+	m_pTrees->setMaxCategories(2);
 }
 
-void LearningKernel::train(cv::Mat trainingSet, int layout)
+void LearningKernel::train(cv::Mat trainingSet, int layout, cv::Mat response)
 {
 	if ( layout != cv::ml::COL_SAMPLE && layout != cv::ml::ROW_SAMPLE ) {
 		std::cout << "training set layout " << layout << " is invalid.\n";
 		return;
 	}
 
-	cv::Mat response;
 	m_pTrees->train(trainingSet, layout, response);
+	//std::cout << "yay!! not crashing anymore!!" << "\n";
 }
 
 LearningKernel::~LearningKernel() {
-	// TODO Auto-generated destructor stub
+
 }
 

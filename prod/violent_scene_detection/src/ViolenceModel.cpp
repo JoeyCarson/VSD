@@ -147,8 +147,10 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(std::string resourcePath)
 
 void ViolenceModel::train()
 {
-	// Index the training store.
-	learningKernel.train(trainingStore, cv::ml::ROW_SAMPLE);
+	// Train the model with the stored training sample matrix.  Since we assume that
+	// all of the indexed videos are violent, the response vector is all true (1).
+	cv::Mat trueResponse = cv::Mat::ones(trainingStore.size().height, 1, CV_32F);
+	learningKernel.train(trainingStore, cv::ml::ROW_SAMPLE, trueResponse);
 }
 
 std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> blobs)
@@ -192,13 +194,14 @@ std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> b
 
 void ViolenceModel::addTrainingSample(std::vector<cv::Mat> trainingSample)
 {
-	if ( !trainingSample.size() == 1 )
+	if ( trainingSample.size() >= 1 )
 	{
 		cv::Mat v1Sample = trainingSample[0];
 		// OpenCV size is as follows.  [width (columns), height (rows)].
 		// We effectively want to resize the matrix according to the
 		// width (columns) of the training sample.
-		if ( trainingStore.size().width != v1Sample.size().width ) {
+		if ( trainingStore.size().width != v1Sample.size().width )
+		{
 			std::cout << "updating training store size. current: " << trainingStore.size() <<"\n";
 			// Create the training store with 0 rows of the training sample's width (column count).
 			trainingStore.create(0, v1Sample.size().width, CV_32F);

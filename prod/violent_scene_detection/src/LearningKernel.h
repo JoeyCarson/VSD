@@ -25,8 +25,9 @@ public:
 	 * Trains the learning model with the given training set.
 	 * @param trainingSet - A matrix of training samples.
 	 * @param layout - The layout of the matrix.  Must be either ROW_SAMPLE or COL_SAMPLE.
+	 * @param response - Column vector of training class responses.
 	 */
-	void train(cv::Mat trainingSet, int layout);
+	void train(cv::Mat trainingSet, int layout, cv::Mat response);
 
 private:
 	cv::Ptr<cv::ml::RTrees> m_pTrees;
