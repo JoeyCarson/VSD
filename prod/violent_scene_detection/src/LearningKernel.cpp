@@ -17,10 +17,9 @@ LearningKernel::LearningKernel()
 
 void LearningKernel::initRandomTrees()
 {
-	m_pTrees->setMaxDepth(1);
-	m_pTrees->setMinSampleCount(1);
+	m_pTrees->setMaxDepth(200);
+	m_pTrees->setMinSampleCount(2);
 
-	//cv::ml::TermCriteria c;
 	cv::TermCriteria criteria(cv::TermCriteria::EPS, 0, 0);
 	m_pTrees->setTermCriteria(criteria);
 	m_pTrees->setCalculateVarImportance(false);

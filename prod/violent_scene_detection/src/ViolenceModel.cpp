@@ -24,6 +24,7 @@
 
 #define VIOLENCE_MODEL_DB_NAME "violence_model.db"
 #define VIOLENCE_MODEL_TRAINING_SET "violence_model_train"
+#define VIOLENCE_MODEL_TRAINING_SET_CLASSES "violence_model_train_classes"
 
 // This is just a suitable default for now.  Eventually, this should be made configurable.
 const uint GRACIA_K = 8;
@@ -36,7 +37,8 @@ ViolenceModel::ViolenceModel(std::string trainingStorePath)
 
 void ViolenceModel::clear()
 {
-	trainingStore.create(0, 0, CV_32F);
+	trainingExampleStore.create(0, 0, CV_32F);
+	trainingClassStore.create(0, 0, CV_8U);
 	persistTrainingStore();
 }
 
@@ -49,14 +51,19 @@ void ViolenceModel::trainingStoreInit()
 		return;
 	}
 
-	file[VIOLENCE_MODEL_TRAINING_SET] >> trainingStore;
-	std::cout << "trainingStore loaded. size: " << trainingStore.size() << "\n";
+	file[VIOLENCE_MODEL_TRAINING_SET] >> trainingExampleStore;
+	std::cout << "trainingExampleStore loaded. size: " << trainingExampleStore.size() << "\n";
+
+	file[VIOLENCE_MODEL_TRAINING_SET_CLASSES] >> trainingClassStore;
+	std::cout << "trainingClassStore loaded. size: " << trainingClassStore.size() << "\n";
+
+	assert(trainingClassStore.size().height == trainingExampleStore.size().height);
 }
 
-void ViolenceModel::index(std::string resourcePath)
+void ViolenceModel::index(std::string resourcePath, bool isViolent)
 {
 	std::vector<cv::Mat> trainingSample = extractFeatures(resourcePath);
-	addTrainingSample(trainingSample);
+	addTrainingSample(trainingSample, isViolent);
 }
 
 std::vector<cv::Mat> ViolenceModel::extractFeatures(std::string resourcePath)
@@ -149,8 +156,8 @@ void ViolenceModel::train()
 {
 	// Train the model with the stored training sample matrix.  Since we assume that
 	// all of the indexed videos are violent, the response vector is all true (1).
-	cv::Mat trueResponse = cv::Mat::ones(trainingStore.size().height, 1, CV_32F);
-	learningKernel.train(trainingStore, cv::ml::ROW_SAMPLE, trueResponse);
+	cv::Mat trueResponse = cv::Mat::ones(trainingExampleStore.size().height, 1, CV_32F);
+	learningKernel.train(trainingExampleStore, cv::ml::ROW_SAMPLE, trueResponse);
 }
 
 std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> blobs)
@@ -192,7 +199,7 @@ std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> b
 	return retVect;
 }
 
-void ViolenceModel::addTrainingSample(std::vector<cv::Mat> trainingSample)
+void ViolenceModel::addTrainingSample(std::vector<cv::Mat> trainingSample, bool isViolent)
 {
 	if ( trainingSample.size() >= 1 )
 	{
@@ -200,17 +207,22 @@ void ViolenceModel::addTrainingSample(std::vector<cv::Mat> trainingSample)
 		// OpenCV size is as follows.  [width (columns), height (rows)].
 		// We effectively want to resize the matrix according to the
 		// width (columns) of the training sample.
-		if ( trainingStore.size().width != v1Sample.size().width )
+		if ( trainingExampleStore.size().width != v1Sample.size().width )
 		{
-			std::cout << "updating training store size. current: " << trainingStore.size() <<"\n";
+			std::cout << "updating training store size. current: " << trainingExampleStore.size() <<"\n";
 			// Create the training store with 0 rows of the training sample's width (column count).
-			trainingStore.create(0, v1Sample.size().width, CV_32F);
-			std::cout << "new training store size " << v1Sample.size() << "\n";
+			trainingExampleStore.create(0, v1Sample.size().width, CV_32F);
+			trainingClassStore.create(0, 1, CV_8U);
+			std::cout << "new trainingExampleStore size: " << v1Sample.size() << " trainingClassStore size:" << trainingClassStore.size() <<"\n";
 		}
 
 		// Add it to the training store.
-		trainingStore.push_back(v1Sample);
-		std::cout<<"training store size after add: " << trainingStore.size() << "\n";
+		trainingExampleStore.push_back(v1Sample);
+
+		// Add the class (true or false) to the training class store.
+		cv::Mat classMat = (cv::Mat_<bool>(1,1) << isViolent);
+		trainingClassStore.push_back(classMat);
+		std::cout<<"training store size after add: " << trainingExampleStore.size() << "trainingClassStore size: " << trainingClassStore.size() <<"\n";
 
 		// Save the training store.
 		persistTrainingStore();
@@ -229,7 +241,8 @@ void ViolenceModel::persistTrainingStore()
 	}
 
 	std::cout << "persisting training store" << "\n";
-	file << VIOLENCE_MODEL_TRAINING_SET << trainingStore;
+	file << VIOLENCE_MODEL_TRAINING_SET << trainingExampleStore;
+	file << VIOLENCE_MODEL_TRAINING_SET_CLASSES << trainingClassStore;
 }
 
 ViolenceModel::~ViolenceModel() {

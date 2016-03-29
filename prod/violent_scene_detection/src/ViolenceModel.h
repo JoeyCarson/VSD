@@ -46,8 +46,10 @@ public:
 	/**
 	 * Index the resource in the file system represented by resourcePath into the training store.
 	 * This method extracts the feature vector and adds it to the training set.
+	 * @param resourcePath - The path to the input file to index as a training sample.
+	 * @param isViolent - true (default) if the given is a positive example of violence, false otherwise.
 	 */
-	void index(std::string resourcePath);
+	void index(std::string resourcePath, bool isViolent = true);
 
 	/**
 	 * Trains the learning model using the existing indexed training set.
@@ -67,7 +69,8 @@ public:
 private:
 
 	std::string trainingStorePath;
-	cv::Mat trainingStore;
+	cv::Mat trainingExampleStore;
+	cv::Mat trainingClassStore;
 	LearningKernel learningKernel;
 
 	void trainingStoreInit();
@@ -83,7 +86,7 @@ private:
 	 * Add the training samples for their respective algorithms to their respective
 	 * training store.
 	 */
-	void addTrainingSample(std::vector<cv::Mat> trainingSample);
+	void addTrainingSample(std::vector<cv::Mat> trainingSample, bool isViolent);
 
 	/**
 	 * Saves the training store to its file path.

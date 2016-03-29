@@ -12,7 +12,7 @@ int main() {
 	ViolenceModel vm;
 
 	// First clear the training store.
-	//vm.clear();
+	vm.clear();
 	vm.index("output.mp4");
 	vm.train();
 
