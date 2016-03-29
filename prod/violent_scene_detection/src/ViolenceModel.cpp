@@ -38,7 +38,7 @@ ViolenceModel::ViolenceModel(std::string trainingStorePath)
 void ViolenceModel::clear()
 {
 	trainingExampleStore.create(0, 0, CV_32F);
-	trainingClassStore.create(0, 0, CV_8U);
+	trainingClassStore.create(0, 0, CV_32F);
 	persistTrainingStore();
 }
 
@@ -51,12 +51,14 @@ void ViolenceModel::trainingStoreInit()
 		return;
 	}
 
+	// Read the data structures in from the training store.
 	file[VIOLENCE_MODEL_TRAINING_SET] >> trainingExampleStore;
 	std::cout << "trainingExampleStore loaded. size: " << trainingExampleStore.size() << "\n";
 
 	file[VIOLENCE_MODEL_TRAINING_SET_CLASSES] >> trainingClassStore;
 	std::cout << "trainingClassStore loaded. size: " << trainingClassStore.size() << "\n";
 
+	// Ensure we go no further the heigt (rows) are not equivalent.
 	assert(trainingClassStore.size().height == trainingExampleStore.size().height);
 }
 
@@ -154,10 +156,7 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(std::string resourcePath)
 
 void ViolenceModel::train()
 {
-	// Train the model with the stored training sample matrix.  Since we assume that
-	// all of the indexed videos are violent, the response vector is all true (1).
-	cv::Mat trueResponse = cv::Mat::ones(trainingExampleStore.size().height, 1, CV_32F);
-	learningKernel.train(trainingExampleStore, cv::ml::ROW_SAMPLE, trueResponse);
+	learningKernel.train(trainingExampleStore, cv::ml::ROW_SAMPLE, trainingClassStore);
 }
 
 std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> blobs)
@@ -212,7 +211,7 @@ void ViolenceModel::addTrainingSample(std::vector<cv::Mat> trainingSample, bool 
 			std::cout << "updating training store size. current: " << trainingExampleStore.size() <<"\n";
 			// Create the training store with 0 rows of the training sample's width (column count).
 			trainingExampleStore.create(0, v1Sample.size().width, CV_32F);
-			trainingClassStore.create(0, 1, CV_8U);
+			trainingClassStore.create(0, 1, CV_32F);
 			std::cout << "new trainingExampleStore size: " << v1Sample.size() << " trainingClassStore size:" << trainingClassStore.size() <<"\n";
 		}
 
@@ -220,9 +219,9 @@ void ViolenceModel::addTrainingSample(std::vector<cv::Mat> trainingSample, bool 
 		trainingExampleStore.push_back(v1Sample);
 
 		// Add the class (true or false) to the training class store.
-		cv::Mat classMat = (cv::Mat_<bool>(1,1) << isViolent);
+		cv::Mat classMat = (cv::Mat_<float>(1,1) << (float)isViolent);
 		trainingClassStore.push_back(classMat);
-		std::cout<<"training store size after add: " << trainingExampleStore.size() << "trainingClassStore size: " << trainingClassStore.size() <<"\n";
+		std::cout<<"training store size after add: " << trainingExampleStore.size() << " trainingClassStore size: " << trainingClassStore.size() <<"\n";
 
 		// Save the training store.
 		persistTrainingStore();
@@ -241,6 +240,7 @@ void ViolenceModel::persistTrainingStore()
 	}
 
 	std::cout << "persisting training store" << "\n";
+	//std::cout << "training classes: \n" << trainingClassStore << "\n";
 	file << VIOLENCE_MODEL_TRAINING_SET << trainingExampleStore;
 	file << VIOLENCE_MODEL_TRAINING_SET_CLASSES << trainingClassStore;
 }
