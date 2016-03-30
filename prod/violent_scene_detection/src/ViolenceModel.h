@@ -12,6 +12,7 @@
 
 #include <opencv2/opencv.hpp>
 #include <boost/bimap.hpp>
+#include <boost/filesystem.hpp>
 #include <string>
 
 class ImageBlob;
@@ -66,11 +67,17 @@ public:
 	 */
 	void clear();
 
+	/**
+	 * Returns true if the file at the given path is indexed, false otherwise.
+	 */
+	bool isIndexed(boost::filesystem::path resourcePath);
+
 private:
 
 	std::string trainingStorePath;
 	cv::Mat trainingExampleStore;
 	cv::Mat trainingClassStore;
+	std::map<std::string, time_t> indexCache;
 	LearningKernel learningKernel;
 
 	void trainingStoreInit();
@@ -86,7 +93,7 @@ private:
 	 * Add the training samples for their respective algorithms to their respective
 	 * training store.
 	 */
-	void addTrainingSample(std::vector<cv::Mat> trainingSample, bool isViolent);
+	void addTrainingSample(boost::filesystem::path p, std::vector<cv::Mat> trainingSample, bool isViolent);
 
 	/**
 	 * Saves the training store to its file path.
