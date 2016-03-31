@@ -7,16 +7,18 @@
 option::ArgStatus checkFileArg(const option::Option& option, bool msg);
 
 // http://optionparser.sourceforge.net/
- enum  optionIndex { UNKNOWN, TRAINING_FILE, CLEAR };
+ enum  optionIndex { UNKNOWN, INDEX_FILE, TRAIN, CLEAR };
  const option::Descriptor usage[] =
  {
   {UNKNOWN, 0,"" , ""    ,option::Arg::None, "USAGE: example [options]\n\n"
                                              "Options:" },
-  {TRAINING_FILE, 0, "f", "training-file", &checkFileArg,      "--training-file <file_path>, -f <file_path>  Index the videos specified in file." },
-  {CLEAR,         0, "c", "clear",          option::Arg::None, "--clear, -c  Clear the index store before respecting any other options." },
+  {INDEX_FILE, 0, "f", "index-file", &checkFileArg,     "--index-file <file_path>, -f <file_path>  Index the videos specified in file." },
+  {CLEAR,      0, "c", "clear",      option::Arg::None, "--clear, -c  Clear the index store before respecting any other options." },
+  {TRAIN,      0, "t", "train",      option::Arg::None, "--train, -t  Train the model with the existing index." },
   {0,0,0,0,0,0}
  };
 
+ // Path to index file.
 static boost::filesystem::path indexFilePath;
 
 int main(int argc, char* argv[]) {
@@ -29,9 +31,9 @@ int main(int argc, char* argv[]) {
 	// Create the parser in GNU mode (true as first argument).
 	option::Parser parser(true, usage, argc, argv, options, buffer);
 
-	if (parser.error())
+	if (parser.error()) {
 		return 1;
-
+	}
 
 	ViolenceModel vm;
 
@@ -42,7 +44,10 @@ int main(int argc, char* argv[]) {
 	// First clear the training store.
 	vm.index("output.mp4");
 	vm.index("output_copy.mp4");
-	vm.train();
+
+	if ( options[TRAIN] ) {
+		vm.train();
+	}
 
     return 0;
 }
