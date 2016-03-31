@@ -46,7 +46,7 @@ const uint GRACIA_K = 8;
 ViolenceModel::ViolenceModel(std::string trainingStorePath)
 : trainingStorePath(trainingStorePath)
 {
-	trainingStoreInit();
+	storeInit();
 }
 
 void ViolenceModel::clear()
@@ -55,10 +55,10 @@ void ViolenceModel::clear()
 	trainingExampleStore.create(0, 0, CV_32F);
 	trainingClassStore.create(0, 0, CV_32F);
 	trainingIndexCache.clear();
-	persistTrainingStore();
+	persistStore();
 }
 
-void ViolenceModel::trainingStoreInit()
+void ViolenceModel::storeInit()
 {
 	cv::FileStorage file;
 	bool trainingStoreOpenSuccess = file.open(trainingStorePath, cv::FileStorage::READ);
@@ -72,13 +72,25 @@ void ViolenceModel::trainingStoreInit()
 					VIOLENCE_MODEL_TRAINING_SET_CLASSES, trainingClassStore,
 					VIOLENCE_MODEL_TRAINING_FILE_PATHS, trainingIndexCache);
 
+	// Initialize the training set from the file.
+	storeInit(file, VIOLENCE_MODEL_XVAL_SET, xvalExampleStore,
+					VIOLENCE_MODEL_XVAL_SET_CLASSES, xvalClassStore,
+					VIOLENCE_MODEL_XVAL_FILE_PATHS, xvalIndexCache);
+
+	// Initialize the training set from the file.
+	storeInit(file, VIOLENCE_MODEL_TEST_SET, testExampleStore,
+					VIOLENCE_MODEL_TEST_SET_CLASSES, testClassStore,
+					VIOLENCE_MODEL_TEST_FILE_PATHS, testIndexCache);
+
 
 	// Ensure we go no further the height (rows) are not equivalent.
 	assert(trainingClassStore.size().height == trainingExampleStore.size().height);
 
 }
 
-void ViolenceModel::storeInit(cv::FileStorage file, std::string exampleStoreName, cv::Mat &exampleStore, std::string classStoreName, cv::Mat &classStore, std::string indexCacheName, std::map<std::string, time_t> &indexCache)
+void ViolenceModel::storeInit(cv::FileStorage file, std::string exampleStoreName, cv::Mat &exampleStore,
+													std::string classStoreName, cv::Mat &classStore,
+													std::string indexCacheName, std::map<std::string, time_t> &indexCache)
 {
 	// Read the data structures in from the training store.
 	file[exampleStoreName] >> exampleStore;
@@ -278,12 +290,12 @@ void ViolenceModel::addTrainingSample(boost::filesystem::path path, std::vector<
 			//std::cout << "path: " << absolutePath.generic_string() << " " << modDate << "\n";
 
 			// Save the training store.
-			persistTrainingStore();
+			persistStore();
 		}
 	}
 }
 
-void ViolenceModel::persistTrainingStore()
+void ViolenceModel::persistStore()
 {
 	cv::FileStorage file;
 
@@ -294,12 +306,34 @@ void ViolenceModel::persistTrainingStore()
 		return;
 	}
 
-	std::cout << "persisting training store" << "\n";
-	file << VIOLENCE_MODEL_TRAINING_SET << trainingExampleStore;
-	file << VIOLENCE_MODEL_TRAINING_SET_CLASSES << trainingClassStore;
+	// Persist the training set.
+	persistStore(file, VIOLENCE_MODEL_TRAINING_SET, trainingExampleStore,
+					   VIOLENCE_MODEL_TRAINING_SET_CLASSES, trainingClassStore,
+					   VIOLENCE_MODEL_TRAINING_FILE_PATHS, trainingIndexCache);
 
-	file << VIOLENCE_MODEL_TRAINING_FILE_PATHS << "[";
-	for ( std::pair<std::string, time_t> item : trainingIndexCache )
+	// Persist the cross-validation set.
+	persistStore(file, VIOLENCE_MODEL_XVAL_SET, xvalExampleStore,
+					   VIOLENCE_MODEL_XVAL_SET_CLASSES, xvalClassStore,
+					   VIOLENCE_MODEL_XVAL_FILE_PATHS, xvalIndexCache);
+
+	// Persist the test set.
+	persistStore(file, VIOLENCE_MODEL_TEST_SET, xvalExampleStore,
+					   VIOLENCE_MODEL_TEST_SET_CLASSES, xvalClassStore,
+					   VIOLENCE_MODEL_TEST_FILE_PATHS, xvalIndexCache);
+}
+
+void ViolenceModel::persistStore(cv::FileStorage file, std::string exampleStoreName, const cv::Mat &exampleStore,
+									 				   std::string classStoreName,   const cv::Mat &classStore,
+													   std::string indexCacheName,   const std::map<std::string, time_t> &indexCache)
+{
+
+
+	//std::cout << "persisting " << exampleStoreName << "\n";
+	file << exampleStoreName << exampleStore;
+	file << classStoreName << classStore;
+
+	file << indexCacheName << "[";
+	for ( std::pair<std::string, time_t> item : indexCache )
 	{
 		// OpenCV FileStorage doesn't seem to allow storage of longs, so we must cast to int.
 		// Luckily int time doesn't overflow until 2038, and we're not really using the timestamp right now anyway.
@@ -311,5 +345,5 @@ void ViolenceModel::persistTrainingStore()
 
 ViolenceModel::~ViolenceModel() {
 	// Be sure to save the training store when the model is destroyed.
-	persistTrainingStore();
+	persistStore();
 }

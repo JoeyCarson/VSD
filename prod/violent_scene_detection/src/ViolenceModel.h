@@ -26,8 +26,8 @@ class ViolenceModel {
 public:
 
 	enum VideoSampleType { TRAINING = 0,
-					       CROSS_VALIDATION = 1,
-					       TESTING = 2 };
+					       CROSS_VALIDATION,
+					       TESTING };
 
 	/**
 	 * Constructor.
@@ -57,6 +57,11 @@ public:
 	void index(std::string resourcePath, bool isViolent = true);
 
 	/**
+	 * Returns true if the file at the given path is indexed, false otherwise.
+	 */
+	bool isIndexed(boost::filesystem::path resourcePath);
+
+	/**
 	 * Trains the learning model using the existing indexed training set.
 	 */
 	void train();
@@ -67,28 +72,40 @@ public:
 	void predict();
 
 	/**
-	 * Clear the training store.
+	 * Clear the data set objects and write empty data to store.
 	 */
 	void clear();
 
 	/**
-	 * Returns true if the file at the given path is indexed, false otherwise.
+	 * Saves the training store to its file path.
 	 */
-	bool isIndexed(boost::filesystem::path resourcePath);
+	void persistStore();
 
 private:
 
-	// Path to the training store.
+	// Path to the data set store.
 	std::string trainingStorePath;
 
-	//
+	// Training Set Data Structures.
 	cv::Mat trainingExampleStore;
 	cv::Mat trainingClassStore;
 	std::map<std::string, time_t> trainingIndexCache;
 
+	// Cross Validation Set Data Structures.
+	cv::Mat xvalExampleStore;
+	cv::Mat xvalClassStore;
+	std::map<std::string, time_t> xvalIndexCache;
+
+	// Test Set Data Structures.
+	cv::Mat testExampleStore;
+	cv::Mat testClassStore;
+	std::map<std::string, time_t> testIndexCache;
+
+	// ML Kernel.
 	LearningKernel learningKernel;
 
-	void trainingStoreInit();
+	// Initialize all data sets from the file store.
+	void storeInit();
 
 	/**
 	 * Initialize the given data structures from the file storage object.
@@ -111,9 +128,12 @@ private:
 	void addTrainingSample(boost::filesystem::path p, std::vector<cv::Mat> trainingSample, bool isViolent);
 
 	/**
-	 * Saves the training store to its file path.
+	 *
 	 */
-	void persistTrainingStore();
+	void persistStore(cv::FileStorage file, std::string exampleStoreName, const cv::Mat &exampleStore,
+										 	std::string classStoreName,   const cv::Mat &classStore,
+											std::string indexCacheName,   const std::map<std::string, time_t> &indexCache);
+
 };
 
 #endif /* VIOLENCEMODEL_H_ */

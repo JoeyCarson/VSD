@@ -31,9 +31,7 @@ int main(int argc, char* argv[]) {
 	// Create the parser in GNU mode (true as first argument).
 	option::Parser parser(true, usage, argc, argv, options, buffer);
 
-	if (parser.error()) {
-		return 1;
-	}
+	if ( parser.error() ) return 1;
 
 	ViolenceModel vm;
 
