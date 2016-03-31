@@ -21,10 +21,22 @@
 
 #include <opencv2/opencv.hpp>
 
-
+// Names for accessing training set.
 #define VIOLENCE_MODEL_TRAINING_SET "violence_model_train"
 #define VIOLENCE_MODEL_TRAINING_SET_CLASSES "violence_model_train_classes"
 #define VIOLENCE_MODEL_TRAINING_FILE_PATHS "violence_model_training_file_paths"
+
+// Names for accessing cross validation set.
+#define VIOLENCE_MODEL_XVAL_SET "violence_model_xval"
+#define VIOLENCE_MODEL_XVAL_SET_CLASSES "violence_model_xval_classes"
+#define VIOLENCE_MODEL_XVAL_FILE_PATHS "violence_model_xval_file_paths"
+
+// Names for accessing test set.
+#define VIOLENCE_MODEL_TEST_SET "violence_model_test"
+#define VIOLENCE_MODEL_TEST_SET_CLASSES "violence_model_test_classes"
+#define VIOLENCE_MODEL_TEST_FILE_PATHS "violence_model_test_file_paths"
+
+
 #define VIOLENCE_MODEL_TRAINING_EXAMPLE_MOD_DATE "last_modified"
 #define VIOLENCE_MODEL_TRAINING_EXAMPLE_PATH "path"
 
@@ -39,9 +51,10 @@ ViolenceModel::ViolenceModel(std::string trainingStorePath)
 
 void ViolenceModel::clear()
 {
+	std::cout << "Clearing the model index store.\n";
 	trainingExampleStore.create(0, 0, CV_32F);
 	trainingClassStore.create(0, 0, CV_32F);
-	indexCache.clear();
+	trainingIndexCache.clear();
 	persistTrainingStore();
 }
 
@@ -54,14 +67,27 @@ void ViolenceModel::trainingStoreInit()
 		return;
 	}
 
+	// Initialize the training set from the file.
+	storeInit(file, VIOLENCE_MODEL_TRAINING_SET, trainingExampleStore,
+					VIOLENCE_MODEL_TRAINING_SET_CLASSES, trainingClassStore,
+					VIOLENCE_MODEL_TRAINING_FILE_PATHS, trainingIndexCache);
+
+
+	// Ensure we go no further the height (rows) are not equivalent.
+	assert(trainingClassStore.size().height == trainingExampleStore.size().height);
+
+}
+
+void ViolenceModel::storeInit(cv::FileStorage file, std::string exampleStoreName, cv::Mat &exampleStore, std::string classStoreName, cv::Mat &classStore, std::string indexCacheName, std::map<std::string, time_t> &indexCache)
+{
 	// Read the data structures in from the training store.
-	file[VIOLENCE_MODEL_TRAINING_SET] >> trainingExampleStore;
-	std::cout << "trainingExampleStore loaded. size: " << trainingExampleStore.size() << "\n";
+	file[exampleStoreName] >> exampleStore;
+	std::cout << exampleStoreName << " loaded. size: " << exampleStore.size() << "\n";
 
-	file[VIOLENCE_MODEL_TRAINING_SET_CLASSES] >> trainingClassStore;
-	std::cout << "trainingClassStore loaded. size: " << trainingClassStore.size() << "\n";
+	file[classStoreName] >> classStore;
+	std::cout << classStoreName << " loaded. size: " << classStore.size() << "\n";
 
-	cv::FileNode indexedFilePaths = file[VIOLENCE_MODEL_TRAINING_FILE_PATHS];
+	cv::FileNode indexedFilePaths = file[indexCacheName];
 	cv::FileNodeIterator iter = indexedFilePaths.begin(), end = indexedFilePaths.end();
 	while ( iter != end )
 	{
@@ -70,10 +96,6 @@ void ViolenceModel::trainingStoreInit()
 		indexCache[path] = (time_t)modTime;
 		iter++;
 	}
-
-	// Ensure we go no further the height (rows) are not equivalent.
-	assert(trainingClassStore.size().height == trainingExampleStore.size().height);
-
 }
 
 void ViolenceModel::index(std::string resourcePath, bool isViolent)
@@ -88,16 +110,13 @@ void ViolenceModel::index(std::string resourcePath, bool isViolent)
 bool ViolenceModel::isIndexed(boost::filesystem::path resourcePath)
 {
 	boost::filesystem::path absolutePath( boost::filesystem::absolute(resourcePath) );
-	bool is = indexCache.find(absolutePath.generic_string()) != indexCache.end();
-	std::cout<<"isIndexed: " << is << " path: " << absolutePath.generic_string() << "\n";
+	bool is = trainingIndexCache.find(absolutePath.generic_string()) != trainingIndexCache.end();
+	//std::cout<<"isIndexed: " << is << " path: " << absolutePath.generic_string() << "\n";
 	return is;
 }
 
 std::vector<cv::Mat> ViolenceModel::extractFeatures(std::string resourcePath)
 {
-
-	// TODO: Implement a cache lookup mechanism so that we don't retry to do this each time.
-	// 		 Also so that we can avoid adding duplicate video files in the training set.
 
 	// Create a VideoCapture instance bound to the path.
 	cv::VideoCapture capture(resourcePath);
@@ -175,7 +194,7 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(std::string resourcePath)
 	}
 
 	// Build a single training sample for each algorithm.
-	std::vector<cv::Mat> trainingSample = buildTrainingSample(blobs);
+	std::vector<cv::Mat> trainingSample = buildSample(blobs);
 	return trainingSample;
 }
 
@@ -184,7 +203,7 @@ void ViolenceModel::train()
 	learningKernel.train(trainingExampleStore, cv::ml::ROW_SAMPLE, trainingClassStore);
 }
 
-std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> blobs)
+std::vector<cv::Mat> ViolenceModel::buildSample(std::vector<ImageBlob> blobs)
 {
 	assert(blobs.size() == GRACIA_K);
 	std::vector<cv::Mat> retVect;
@@ -223,17 +242,16 @@ std::vector<cv::Mat> ViolenceModel::buildTrainingSample(std::vector<ImageBlob> b
 	return retVect;
 }
 
-void ViolenceModel::addTrainingSample(boost::filesystem::path path, std::vector<cv::Mat> trainingSample, bool isViolent)
+void ViolenceModel::addTrainingSample(boost::filesystem::path path, std::vector<cv::Mat> sample, bool isViolent)
 {
 	boost::filesystem::path absolutePath = boost::filesystem::absolute(path);
-	std::cout<<"trying again.\n";
 	if ( !isIndexed( absolutePath ) )
 	{
 		std::cout << "training sample at path " << absolutePath << "is not indexed. adding it.\n";
 
-		if ( trainingSample.size() >= 1)
+		if ( sample.size() >= 1)
 		{
-			cv::Mat v1Sample = trainingSample[0];
+			cv::Mat v1Sample = sample[0];
 			// OpenCV size is as follows.  [width (columns), height (rows)].
 			// We effectively want to resize the matrix according to the
 			// width (columns) of the training sample.
@@ -256,7 +274,7 @@ void ViolenceModel::addTrainingSample(boost::filesystem::path path, std::vector<
 
 			// Hash the modification date.
 			time_t modDate = boost::filesystem::last_write_time(absolutePath);
-			indexCache[absolutePath.generic_string()] = modDate;
+			trainingIndexCache[absolutePath.generic_string()] = modDate;
 			//std::cout << "path: " << absolutePath.generic_string() << " " << modDate << "\n";
 
 			// Save the training store.
@@ -281,7 +299,7 @@ void ViolenceModel::persistTrainingStore()
 	file << VIOLENCE_MODEL_TRAINING_SET_CLASSES << trainingClassStore;
 
 	file << VIOLENCE_MODEL_TRAINING_FILE_PATHS << "[";
-	for ( std::pair<std::string, time_t> item : indexCache )
+	for ( std::pair<std::string, time_t> item : trainingIndexCache )
 	{
 		// OpenCV FileStorage doesn't seem to allow storage of longs, so we must cast to int.
 		// Luckily int time doesn't overflow until 2038, and we're not really using the timestamp right now anyway.

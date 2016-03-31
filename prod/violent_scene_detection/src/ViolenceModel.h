@@ -25,6 +25,10 @@ class ViolenceModel {
 
 public:
 
+	enum VideoSampleType { TRAINING = 0,
+					       CROSS_VALIDATION = 1,
+					       TESTING = 2 };
+
 	/**
 	 * Constructor.
 	 * @param trainingStorePath - Path to where the training database file is stored.
@@ -74,20 +78,31 @@ public:
 
 private:
 
+	// Path to the training store.
 	std::string trainingStorePath;
+
+	//
 	cv::Mat trainingExampleStore;
 	cv::Mat trainingClassStore;
-	std::map<std::string, time_t> indexCache;
+	std::map<std::string, time_t> trainingIndexCache;
+
 	LearningKernel learningKernel;
 
 	void trainingStoreInit();
+
+	/**
+	 * Initialize the given data structures from the file storage object.
+	 */
+	void storeInit(cv::FileStorage file, std::string exampleStoreName, cv::Mat &exampleStore,
+										 std::string classStoreName,   cv::Mat &classStore,
+										 std::string indexCacheName,   std::map<std::string, time_t> &indexCache);
 
 	/**
 	 * Builds a training sample based on the number of given image blobs.
 	 * Returns a vector of training samples generated for each version of Gracia's
 	 * algorithm, e.g. [0] is suitable for training v1, [1] is suitable for training v2.
 	 */
-	std::vector<cv::Mat> buildTrainingSample(std::vector<ImageBlob> blobs);
+	std::vector<cv::Mat> buildSample(std::vector<ImageBlob> blobs);
 
 	/**
 	 * Add the training samples for their respective algorithms to their respective

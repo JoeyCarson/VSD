@@ -1,84 +1,67 @@
 #include <iostream>
 #include <ejdb/ejdb.h>
 
+#include "optionparser.h"
 #include "ViolenceModel.h"
 
-static EJDB *jb;
+option::ArgStatus checkFileArg(const option::Option& option, bool msg);
 
-int testEJDB();
+// http://optionparser.sourceforge.net/
+ enum  optionIndex { UNKNOWN, TRAINING_FILE, CLEAR };
+ const option::Descriptor usage[] =
+ {
+  {UNKNOWN, 0,"" , ""    ,option::Arg::None, "USAGE: example [options]\n\n"
+                                             "Options:" },
+  {TRAINING_FILE, 0, "f", "training-file", &checkFileArg,      "--training-file <file_path>, -f <file_path>  Index the videos specified in file." },
+  {CLEAR,         0, "c", "clear",          option::Arg::None, "--clear, -c  Clear the index store before respecting any other options." },
+  {0,0,0,0,0,0}
+ };
 
-int main() {
+static boost::filesystem::path indexFilePath;
+
+int main(int argc, char* argv[]) {
+
+	// Set up command line arg parser.
+	option::Stats  stats(usage, argc, argv);
+	option::Option* options = new option::Option[stats.options_max];
+	option::Option* buffer = new option::Option[stats.buffer_max];
+
+	// Create the parser in GNU mode (true as first argument).
+	option::Parser parser(true, usage, argc, argv, options, buffer);
+
+	if (parser.error())
+		return 1;
+
 
 	ViolenceModel vm;
 
-	// First clear the training store.
-	vm.clear();
-	vm.index("output.mp4");
-	vm.train();
+	if ( options[CLEAR] ) {
+		vm.clear();
+	}
 
-	//testEJDB();
+	// First clear the training store.
+	vm.index("output.mp4");
+	vm.index("output_copy.mp4");
+	vm.train();
 
     return 0;
 }
 
-int testEJDB()
+option::ArgStatus checkFileArg(const option::Option& option, bool msg)
 {
-    jb = ejdbnew();
-    if (!ejdbopen(jb, "addressbook.db", JBOWRITER | JBOCREAT | JBOTRUNC)) {
-    	return 1;
-    }
+	// Only set the input file path if it hasn't been set yet and the argument isn't empty.
+	if ( strcmp(option.arg, "") != 0 && indexFilePath.empty() ) {
+		boost::filesystem::path filePath(option.arg);
+		if ( boost::filesystem::exists(filePath) ) {
+			indexFilePath = filePath;
+			return option::ARG_OK;
+		}
+	}
 
-    //Get or create collection 'contacts'
-    EJCOLL *coll = ejdbcreatecoll(jb, "contacts", NULL);
-
-    bson bsrec;
-    bson_oid_t oid;
-
-    //Insert one record:
-    //JSON: {'name' : 'Bruce', 'phone' : '333-222-333', 'age' : 58}
-    bson_init(&bsrec);
-    bson_append_string(&bsrec, "name", "Bruce");
-    bson_append_string(&bsrec, "phone", "333-222-333");
-    bson_append_int(&bsrec, "age", 58);
-    bson_finish(&bsrec);
-
-    //Save BSON
-    ejdbsavebson(coll, &bsrec, &oid);
-    fprintf(stderr, "\nSaved Bruce");
-    bson_destroy(&bsrec);
-
-    //Now execute query
-    //QUERY: {'name' : {'$begin' : 'Bru'}}
-    //Name starts with 'Bru' string
-
-    bson bq1;
-    bson_init_as_query(&bq1);
-    bson_append_start_object(&bq1, "name");
-    bson_append_string(&bq1, "$begin", "Bru");
-    bson_append_finish_object(&bq1);
-    bson_finish(&bq1);
-
-    EJQ *q1 = ejdbcreatequery(jb, &bq1, NULL, 0, NULL);
-
-    uint32_t count;
-    TCLIST *res = ejdbqryexecute(coll, q1, &count, 0, NULL);
-    fprintf(stderr, "\n\nRecords found: %d\n", count);
-
-    //Now print the result set records
-    for (int i = 0; i < TCLISTNUM(res); ++i) {
-        void *bsdata = TCLISTVALPTR(res, i);
-        bson_print_raw((const char *)bsdata, 0);
-    }
-    fprintf(stderr, "\n");
-
-    //Dispose result set
-    tclistdel(res);
-
-    //Dispose query
-    ejdbquerydel(q1);
-    bson_destroy(&bq1);
-
-    //Close database
-    ejdbclose(jb);
-    ejdbdel(jb);
+	if ( msg ) {
+		const char * pathCStr = option.arg ? option.arg : "<empty>";
+		std::cout<<"Index file at path " << pathCStr << " does not exist. Aborting.\n";
+		option::printUsage(std::cout, usage);
+	}
+	return option::ARG_ILLEGAL;
 }
