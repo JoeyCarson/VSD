@@ -142,7 +142,7 @@ private:
 							cv::Mat &exampleStore, cv::Mat &classStore, std::map<std::string, time_t> &indexCache);
 
 	/**
-	 *
+	 * Store the examples, classes, and indexes in the given file.
 	 */
 	static void persistStore(cv::FileStorage file, std::string exampleStoreName, const cv::Mat &exampleStore,
 										 		   std::string classStoreName,   const cv::Mat &classStore,

@@ -41,7 +41,6 @@ int main(int argc, char* argv[]) {
 	// First clear the training store.
 	vm.index(ViolenceModel::TRAINING, "output.mp4", true);
 	vm.index(ViolenceModel::TESTING, "output_copy.mp4", true);
-	//vm.persistStore();
 
 	if ( options[TRAIN] ) {
 		vm.train();
