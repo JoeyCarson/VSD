@@ -82,10 +82,6 @@ void ViolenceModel::storeInit()
 					VIOLENCE_MODEL_TEST_SET_CLASSES, testClassStore,
 					VIOLENCE_MODEL_TEST_FILE_PATHS, testIndexCache);
 
-
-	// Ensure we go no further the height (rows) are not equivalent.
-	assert(trainingClassStore.size().height == trainingExampleStore.size().height);
-
 }
 
 void ViolenceModel::storeInit(cv::FileStorage file, std::string exampleStoreName, cv::Mat &exampleStore,
@@ -108,21 +104,27 @@ void ViolenceModel::storeInit(cv::FileStorage file, std::string exampleStoreName
 		indexCache[path] = (time_t)modTime;
 		iter++;
 	}
+
+	// Ensure we go no further the height (rows) are not equivalent.
+	assert(classStore.size().height == exampleStore.size().height && classStore.size().height == indexCache.size());
 }
 
-void ViolenceModel::index(std::string resourcePath, bool isViolent)
+void ViolenceModel::index(VideoSetTarget target, std::string resourcePath, bool isViolent)
 {
 	boost::filesystem::path path(resourcePath);
-	if ( !isIndexed(path) ) {
+	if ( !isIndexed(target, path) ) {
 		std::vector<cv::Mat> trainingSample = extractFeatures(resourcePath);
-		addTrainingSample(path, trainingSample, isViolent);
+		addSample(target, path, trainingSample, isViolent);
 	}
 }
 
-bool ViolenceModel::isIndexed(boost::filesystem::path resourcePath)
+bool ViolenceModel::isIndexed(VideoSetTarget target, boost::filesystem::path resourcePath)
 {
+	std::map<std::string, time_t> *index = NULL;
+	resolveDataStructures(target, NULL, NULL, &index);
+
 	boost::filesystem::path absolutePath( boost::filesystem::absolute(resourcePath) );
-	bool is = trainingIndexCache.find(absolutePath.generic_string()) != trainingIndexCache.end();
+	bool is = index ? index->find( absolutePath.generic_string() ) != index->end() : false;
 	//std::cout<<"isIndexed: " << is << " path: " << absolutePath.generic_string() << "\n";
 	return is;
 }
@@ -254,11 +256,59 @@ std::vector<cv::Mat> ViolenceModel::buildSample(std::vector<ImageBlob> blobs)
 	return retVect;
 }
 
-void ViolenceModel::addTrainingSample(boost::filesystem::path path, std::vector<cv::Mat> sample, bool isViolent)
+bool ViolenceModel::resolveDataStructures(VideoSetTarget target, cv::Mat **exampleStore, cv::Mat **classStore , std::map<std::string, time_t> **indexCache)
+{
+
+	// Training Set Data Structures.
+	cv::Mat *examples = NULL;
+	cv::Mat *classes = NULL;
+	std::map<std::string, time_t> *index = NULL;
+
+	switch ( target )
+	{
+		case ViolenceModel::TRAINING:
+			examples = &trainingExampleStore;
+			classes = &trainingClassStore;
+			index = &trainingIndexCache;
+			break;
+
+		case ViolenceModel::TESTING:
+			examples = &testExampleStore;
+			classes = &testClassStore;
+			index = &testIndexCache;
+			break;
+
+		case ViolenceModel::X_VALIDATION:
+			examples = &xvalExampleStore;
+			classes = &xvalClassStore;
+			index = &xvalIndexCache;
+			break;
+
+		default: {
+			std::cout << "VideoSetTarget " << target << " is invalid.";
+			assert(false);
+		}
+	}
+
+	// Write the pointers if output pointers are given.
+	if ( exampleStore ) *exampleStore = examples;
+	if ( classStore   ) *classStore   = classes;
+	if ( indexCache   ) *indexCache   = index;
+
+	return true;
+}
+
+void ViolenceModel::addSample(VideoSetTarget target, boost::filesystem::path path, std::vector<cv::Mat> sample, bool isViolent)
 {
 	boost::filesystem::path absolutePath = boost::filesystem::absolute(path);
-	if ( !isIndexed( absolutePath ) )
+	if ( !isIndexed( target, absolutePath ) )
 	{
+
+		cv::Mat *exampleStore;
+		cv::Mat *classStore;
+		std::map<std::string, time_t> *indexCache;
+		resolveDataStructures(target, &exampleStore, &classStore, &indexCache);
+
 		std::cout << "training sample at path " << absolutePath << "is not indexed. adding it.\n";
 
 		if ( sample.size() >= 1)
@@ -267,30 +317,27 @@ void ViolenceModel::addTrainingSample(boost::filesystem::path path, std::vector<
 			// OpenCV size is as follows.  [width (columns), height (rows)].
 			// We effectively want to resize the matrix according to the
 			// width (columns) of the training sample.
-			if ( trainingExampleStore.size().width != v1Sample.size().width )
+			if ( exampleStore->size().width != v1Sample.size().width )
 			{
-				std::cout << "updating training store size. current: " << trainingExampleStore.size() <<"\n";
+				std::cout << "updating training store size. current: " << exampleStore->size() <<"\n";
 				// Create the training store with 0 rows of the training sample's width (column count).
-				trainingExampleStore.create(0, v1Sample.size().width, CV_32F);
-				trainingClassStore.create(0, 1, CV_32F);
-				std::cout << "new trainingExampleStore size: " << trainingExampleStore.size() << " trainingClassStore size:" << trainingClassStore.size() <<"\n";
+				exampleStore->create(0, v1Sample.size().width, CV_32F);
+				classStore->create(0, 1, CV_32F);
+				std::cout << "new trainingExampleStore size: " << exampleStore->size() << " trainingClassStore size:" << classStore->size() <<"\n";
 			}
 
 			// Add it to the training store.
-			trainingExampleStore.push_back(v1Sample);
+			exampleStore->push_back(v1Sample);
 
 			// Add the class (true or false) to the training class store.
 			cv::Mat classMat = (cv::Mat_<float>(1,1) << (float)isViolent);
-			trainingClassStore.push_back(classMat);
-			std::cout<<"training store size after add: " << trainingExampleStore.size() << " trainingClassStore size: " << trainingClassStore.size() <<"\n";
+			classStore->push_back(classMat);
+			std::cout<<"training store size after add: " << classStore->size() << " trainingClassStore size: " << classStore->size() <<"\n";
 
 			// Hash the modification date.
 			time_t modDate = boost::filesystem::last_write_time(absolutePath);
-			trainingIndexCache[absolutePath.generic_string()] = modDate;
+			(*indexCache)[absolutePath.generic_string()] = modDate;
 			//std::cout << "path: " << absolutePath.generic_string() << " " << modDate << "\n";
-
-			// Save the training store.
-			persistStore();
 		}
 	}
 }
@@ -317,9 +364,9 @@ void ViolenceModel::persistStore()
 					   VIOLENCE_MODEL_XVAL_FILE_PATHS, xvalIndexCache);
 
 	// Persist the test set.
-	persistStore(file, VIOLENCE_MODEL_TEST_SET, xvalExampleStore,
-					   VIOLENCE_MODEL_TEST_SET_CLASSES, xvalClassStore,
-					   VIOLENCE_MODEL_TEST_FILE_PATHS, xvalIndexCache);
+	persistStore(file, VIOLENCE_MODEL_TEST_SET, testExampleStore,
+					   VIOLENCE_MODEL_TEST_SET_CLASSES, testClassStore,
+					   VIOLENCE_MODEL_TEST_FILE_PATHS, testIndexCache);
 }
 
 void ViolenceModel::persistStore(cv::FileStorage file, std::string exampleStoreName, const cv::Mat &exampleStore,

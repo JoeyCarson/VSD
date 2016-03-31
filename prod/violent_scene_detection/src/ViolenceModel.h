@@ -19,15 +19,16 @@ class ImageBlob;
 
 /**
  * The ViolenceModel class encapsulates the feature extraction operations of
- * Gracia's algorithm.  It should persist all relevant feature data in an EJDB database.
+ * Gracia's algorithm.  It persists all relevant feature data using cv::FileStorage.
  */
 class ViolenceModel {
 
 public:
 
-	enum VideoSampleType { TRAINING = 0,
-					       CROSS_VALIDATION,
-					       TESTING };
+	enum VideoSetTarget { TRAINING = 0,
+					      X_VALIDATION,
+					      TESTING,
+						  SAMPLE_TYPE_COUNT };
 
 	/**
 	 * Constructor.
@@ -54,12 +55,12 @@ public:
 	 * @param resourcePath - The path to the input file to index as a training sample.
 	 * @param isViolent - true (default) if the given is a positive example of violence, false otherwise.
 	 */
-	void index(std::string resourcePath, bool isViolent = true);
+	void index(VideoSetTarget target, std::string resourcePath, bool isViolent = true);
 
 	/**
 	 * Returns true if the file at the given path is indexed, false otherwise.
 	 */
-	bool isIndexed(boost::filesystem::path resourcePath);
+	bool isIndexed(VideoSetTarget target, boost::filesystem::path resourcePath);
 
 	/**
 	 * Trains the learning model using the existing indexed training set.
@@ -78,6 +79,7 @@ public:
 
 	/**
 	 * Saves the training store to its file path.
+	 * Note that when a lot of videos are indexed, this call is probably NOT cheap.
 	 */
 	void persistStore();
 
@@ -108,14 +110,20 @@ private:
 	void storeInit();
 
 	/**
-	 * Initialize the given data structures from the file storage object.
+	 * Resolve the data structures that are associated with the given target.
 	 */
-	void storeInit(cv::FileStorage file, std::string exampleStoreName, cv::Mat &exampleStore,
-										 std::string classStoreName,   cv::Mat &classStore,
-										 std::string indexCacheName,   std::map<std::string, time_t> &indexCache);
+	bool resolveDataStructures(VideoSetTarget target, cv::Mat **exampleStore, cv::Mat **classStore , std::map<std::string, time_t> **indexCache);
+
 
 	/**
-	 * Builds a training sample based on the number of given image blobs.
+	 * Initialize the given data structures from the file storage object.
+	 */
+	static void storeInit(cv::FileStorage file, std::string exampleStoreName, cv::Mat &exampleStore,
+										 	    std::string classStoreName,   cv::Mat &classStore,
+												std::string indexCacheName,   std::map<std::string, time_t> &indexCache);
+
+	/**
+	 * Builds a sample based on the number of given image blobs.
 	 * Returns a vector of training samples generated for each version of Gracia's
 	 * algorithm, e.g. [0] is suitable for training v1, [1] is suitable for training v2.
 	 */
@@ -125,14 +133,20 @@ private:
 	 * Add the training samples for their respective algorithms to their respective
 	 * training store.
 	 */
-	void addTrainingSample(boost::filesystem::path p, std::vector<cv::Mat> trainingSample, bool isViolent);
+	void addSample(VideoSetTarget target, boost::filesystem::path p, std::vector<cv::Mat> trainingSample, bool isViolent);
+
+	/**
+	 * Add the sample data to the
+	 */
+	static void updateStore(boost::filesystem::path filePath, cv::Mat inputSample,
+							cv::Mat &exampleStore, cv::Mat &classStore, std::map<std::string, time_t> &indexCache);
 
 	/**
 	 *
 	 */
-	void persistStore(cv::FileStorage file, std::string exampleStoreName, const cv::Mat &exampleStore,
-										 	std::string classStoreName,   const cv::Mat &classStore,
-											std::string indexCacheName,   const std::map<std::string, time_t> &indexCache);
+	static void persistStore(cv::FileStorage file, std::string exampleStoreName, const cv::Mat &exampleStore,
+										 		   std::string classStoreName,   const cv::Mat &classStore,
+												   std::string indexCacheName,   const std::map<std::string, time_t> &indexCache);
 
 };
 

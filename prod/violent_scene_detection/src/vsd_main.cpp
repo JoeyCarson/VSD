@@ -10,11 +10,10 @@ option::ArgStatus checkFileArg(const option::Option& option, bool msg);
  enum  optionIndex { UNKNOWN, INDEX_FILE, TRAIN, CLEAR };
  const option::Descriptor usage[] =
  {
-  {UNKNOWN, 0,"" , ""    ,option::Arg::None, "USAGE: example [options]\n\n"
-                                             "Options:" },
+  {UNKNOWN,    0, "",  "",			 option::Arg::None, "USAGE: example [options]\n\n""Options:" },
   {INDEX_FILE, 0, "f", "index-file", &checkFileArg,     "--index-file <file_path>, -f <file_path>  Index the videos specified in file." },
-  {CLEAR,      0, "c", "clear",      option::Arg::None, "--clear, -c  Clear the index store before respecting any other options." },
   {TRAIN,      0, "t", "train",      option::Arg::None, "--train, -t  Train the model with the existing index." },
+  {CLEAR,      0, "c", "clear",      option::Arg::None, "--clear, -c  Clear the index store before respecting any other options." },
   {0,0,0,0,0,0}
  };
 
@@ -40,8 +39,9 @@ int main(int argc, char* argv[]) {
 	}
 
 	// First clear the training store.
-	vm.index("output.mp4");
-	vm.index("output_copy.mp4");
+	vm.index(ViolenceModel::TRAINING, "output.mp4", true);
+	vm.index(ViolenceModel::TESTING, "output_copy.mp4", true);
+	//vm.persistStore();
 
 	if ( options[TRAIN] ) {
 		vm.train();
