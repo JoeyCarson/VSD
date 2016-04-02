@@ -56,7 +56,7 @@ void ViolenceModel::clear()
 	cv::Mat *classStore;
 	std::map<std::string, time_t> *indexCache;
 
-	// TODO: Can we do this in a loop?
+	// TODO: Can't we do this in a loop?
 	resolveDataStructures(ViolenceModel::TRAINING, &exampleStore, &classStore, &indexCache);
 	if ( exampleStore && classStore && indexCache) {
 		exampleStore->create(0, 0, CV_32F);
@@ -294,7 +294,7 @@ std::vector<cv::Mat> ViolenceModel::buildSample(std::vector<ImageBlob> blobs)
 
 bool ViolenceModel::resolveDataStructures(VideoSetTarget target, cv::Mat **exampleStore, cv::Mat **classStore , std::map<std::string, time_t> **indexCache)
 {
-
+	bool successfullyResolved = true;
 	// Training Set Data Structures.
 	cv::Mat *examples = NULL;
 	cv::Mat *classes = NULL;
@@ -323,15 +323,16 @@ bool ViolenceModel::resolveDataStructures(VideoSetTarget target, cv::Mat **examp
 		default: {
 			std::cout << "VideoSetTarget " << target << " is invalid.";
 			assert(false);
+			successfullyResolved = false;
 		}
 	}
 
-	// Write the pointers if output pointers are given.
+	// Write the addresses if output pointers are given.
 	if ( exampleStore ) *exampleStore = examples;
 	if ( classStore   ) *classStore   = classes;
 	if ( indexCache   ) *indexCache   = index;
 
-	return true;
+	return successfullyResolved;
 }
 
 void ViolenceModel::addSample(VideoSetTarget target, boost::filesystem::path path, std::vector<cv::Mat> sample, bool isViolent)

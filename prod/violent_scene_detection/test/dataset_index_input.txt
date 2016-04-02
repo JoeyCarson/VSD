@@ -1,0 +1,7 @@
+# dataset_target Corresponds to ViolenceModel::VideoSetTarget (0 = train, 1 = cross validation, 2 = testing)
+# is_violent (0 = false, 1 = true).
+# file_path path to video file to index.
+# Each line must be of the form <dataset_target> <is_violent> <file_path>
+# Example: 0 1 video/definitely_has_fighting.mp4
+0 1 output.mp4
+2 0 output_copy.mp4
