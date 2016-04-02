@@ -31,8 +31,8 @@ int main(int argc, char* argv[]) {
 
 	// Set up command line arg parser.
 	option::Stats  stats(usage, argc, argv);
-	option::Option* options = new option::Option[stats.options_max];
-	option::Option* buffer = new option::Option[stats.buffer_max];
+	option::Option options[256];
+	option::Option buffer[256];
 
 	// Create the parser in GNU mode (true as first argument).
 	option::Parser parser(true, usage, argc, argv, options, buffer);
