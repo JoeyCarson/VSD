@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
 bool process_index_file(boost::filesystem::path path, ViolenceModel &model)
 {
 	if ( !boost::filesystem::exists(path) ) {
-		std::cout << "Index file doesn't exist.";
+		std::cout << "Index file doesn't exist.\n";
 		return false;
 	}
 

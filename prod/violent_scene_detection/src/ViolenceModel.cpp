@@ -361,7 +361,7 @@ void ViolenceModel::addSample(VideoSetTarget target, boost::filesystem::path pat
 					// Create the training store with 0 rows of the training sample's width (column count).
 					exampleStore->create(0, v1Sample.size().width, CV_32F);
 					classStore->create(0, 1, CV_32F);
-					std::cout << "new trainingExampleStore size: " << exampleStore->size() << " trainingClassStore size:" << classStore->size() <<"\n";
+					std::cout << "new exampleStore size: " << exampleStore->size() << " classStore size:" << classStore->size() <<"\n";
 				}
 
 				// Add it to the training store.
@@ -370,7 +370,7 @@ void ViolenceModel::addSample(VideoSetTarget target, boost::filesystem::path pat
 				// Add the class (true or false) to the training class store.
 				cv::Mat classMat = (cv::Mat_<float>(1,1) << (float)isViolent);
 				classStore->push_back(classMat);
-				std::cout<<"training store size after add: " << classStore->size() << " trainingClassStore size: " << classStore->size() <<"\n";
+				std::cout<<"exampleStore size after add: " << exampleStore->size() << " classStore size: " << classStore->size() <<"\n";
 
 				// Hash the modification date.
 				time_t modDate = boost::filesystem::last_write_time(absolutePath);
