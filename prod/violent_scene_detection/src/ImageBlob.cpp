@@ -8,11 +8,6 @@
 #include "ImageBlob.h"
 
 
-//ImageBlob::ImageBlob(const ImageBlob &ref)
-//{
-//	this->m_points = ref.points();
-//}
-
 ImageBlob::ImageBlob(std::vector<cv::Point> points)
 : m_points(points)
 {

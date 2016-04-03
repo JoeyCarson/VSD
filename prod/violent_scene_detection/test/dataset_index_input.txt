@@ -5,3 +5,4 @@
 # Example: 0 1 video/definitely_has_fighting.mp4
 0 1 output.mp4
 0 0 output_copy.mp4
+0 1 video/HockeyFights_Violent

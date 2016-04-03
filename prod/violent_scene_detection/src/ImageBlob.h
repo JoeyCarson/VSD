@@ -22,7 +22,6 @@ public:
 	 * Constructor.
 	 * @param points - A vector of the pixel coordinates that describes the contour of the blob.
 	 */
-	//ImageBlob(const ImageBlob &ref);
 	ImageBlob(std::vector<cv::Point> points);
 	virtual ~ImageBlob();
 
