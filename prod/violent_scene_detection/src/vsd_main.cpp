@@ -130,6 +130,7 @@ bool process_index_file(boost::filesystem::path path, ViolenceModel &model)
 						std::cout << "input file -> child path is a directory.  Skipping it.\n";
 					}
 				}
+
 			} else {
 				pathsToIndex.push_back(videoPathStr);
 			}
@@ -140,7 +141,9 @@ bool process_index_file(boost::filesystem::path path, ViolenceModel &model)
 				//       that specifies the file name format (eg. img_%02d.jpg -> img_00.jpg, img_01.jpg, img_02.jpg, ...).
 				//       Since these strings are more difficult to parse, we can simply attempt a file open first.
 				//       That way the file path can be compatible with this feature as well.  Hopefully this isn't too expensive.
-				if ( vc.open(pathStr) ) {
+				if ( !model.isIndexed(target, pathStr) ) {
+					std::cout << "process_index_file -> skipping indexed path: " << pathStr;
+				} else if ( vc.open(pathStr) ) {
 					// Woohoo!!
 					model.index(target, pathStr, isViolent);
 				} else {

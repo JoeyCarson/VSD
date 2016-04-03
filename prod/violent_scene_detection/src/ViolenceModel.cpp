@@ -151,6 +151,8 @@ void ViolenceModel::index(VideoSetTarget target, std::string resourcePath, bool 
 	if ( !isIndexed(target, path) ) {
 		std::vector<cv::Mat> trainingSample = extractFeatures(resourcePath);
 		addSample(target, path, trainingSample, isViolent);
+	} else {
+		std::cout << "index -> skipping indexed path: " << resourcePath << "\n";
 	}
 }
 
