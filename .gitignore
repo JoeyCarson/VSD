@@ -11,3 +11,6 @@ Release
 
 # Ignore RemoteSystemsTempFiles
 RemoteSystemsTempFiles
+
+# Ignore test 
+prod/violent_scene_detection/test/video
