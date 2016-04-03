@@ -6,13 +6,20 @@
  */
 
 #include "LearningKernel.h"
-
+//#include <opencv2/ml.hpp>
 // http://docs.opencv.org/3.0-beta/modules/ml/doc/statistical_models.html
 
-LearningKernel::LearningKernel()
-: m_pTrees( cv::ml::RTrees::create( ) )
+LearningKernel::LearningKernel(std::string modelPath)
+: statModelPath(modelPath),
+  m_pTrees( cv::ml::StatModel::load<cv::ml::RTrees>(statModelPath) )
 {
-	initRandomTrees();
+	if ( !m_pTrees ) {
+		m_pTrees = cv::ml::RTrees::create();
+	}
+
+	if ( m_pTrees && m_pTrees->empty() ) {
+		initRandomTrees();
+	}
 }
 
 void LearningKernel::initRandomTrees()
@@ -40,6 +47,8 @@ void LearningKernel::train(cv::Mat trainingSet, int layout, cv::Mat response)
 }
 
 LearningKernel::~LearningKernel() {
-
+	if ( m_pTrees && !m_pTrees->empty() && m_pTrees->isTrained() ) {
+		m_pTrees->save(statModelPath);
+	}
 }
 

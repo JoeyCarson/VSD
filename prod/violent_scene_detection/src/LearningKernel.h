@@ -18,7 +18,7 @@
 class LearningKernel {
 
 public:
-	LearningKernel();
+	LearningKernel(std::string modelPath = "default_stat_model.xml");
 	virtual ~LearningKernel();
 
 	/**
@@ -30,6 +30,7 @@ public:
 	void train(cv::Mat trainingSet, int layout, cv::Mat response);
 
 private:
+	std::string statModelPath;
 	cv::Ptr<cv::ml::RTrees> m_pTrees;
 	void initRandomTrees();
 

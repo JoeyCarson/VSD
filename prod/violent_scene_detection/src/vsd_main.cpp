@@ -142,7 +142,7 @@ bool process_index_file(boost::filesystem::path path, ViolenceModel &model)
 				//       Since these strings are more difficult to parse, we can simply attempt a file open first.
 				//       That way the file path can be compatible with this feature as well.  Hopefully this isn't too expensive.
 				if ( !model.isIndexed(target, pathStr) ) {
-					std::cout << "process_index_file -> skipping indexed path: " << pathStr;
+					std::cout << "process_index_file -> skipping indexed path: " << pathStr << "\n";
 				} else if ( vc.open(pathStr) ) {
 					// Woohoo!!
 					model.index(target, pathStr, isViolent);

@@ -5,4 +5,7 @@
 # Example: 0 1 video/definitely_has_fighting.mp4
 0 1 output.mp4
 0 0 output_copy.mp4
-0 1 video/HockeyFights_Violent
+# These lines are directories, so all first level children will be indexed
+# with the same class. 
+0 1 ./video/HockeyFights_Violent
+0 0 ./video/HockeyFights_NonViolent

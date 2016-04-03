@@ -94,6 +94,8 @@ void ViolenceModel::storeInit()
 	cv::Mat *classStore;
 	std::map<std::string, time_t> *indexCache;
 
+	std::cout << "initializing ViolenceModel storage structures.";
+
 	// Initialize the training set from the file.
 	resolveDataStructures(ViolenceModel::TRAINING, &exampleStore, &classStore, &indexCache);
 	if ( exampleStore && classStore && indexCache ) {
