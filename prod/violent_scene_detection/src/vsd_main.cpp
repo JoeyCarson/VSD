@@ -55,12 +55,16 @@ int main(int argc, char* argv[]) {
 	}
 
 	if ( !indexFilePath.empty() && !process_index_file(indexFilePath, vm) ) {
-		std::cout << "process_index_file failed. Aborting.";
+		std::cout << "process_index_file failed. Aborting.\n";
 		return 2;
 	}
 
 	if ( options[TRAIN] ) {
 		vm.train();
+	}
+
+	if ( options[PREDICT] ) {
+
 	}
 
     return 0;
@@ -141,7 +145,7 @@ bool process_index_file(boost::filesystem::path path, ViolenceModel &model)
 				//       that specifies the file name format (eg. img_%02d.jpg -> img_00.jpg, img_01.jpg, img_02.jpg, ...).
 				//       Since these strings are more difficult to parse, we can simply attempt a file open first.
 				//       That way the file path can be compatible with this feature as well.  Hopefully this isn't too expensive.
-				if ( !model.isIndexed(target, pathStr) ) {
+				if ( model.isIndexed(target, pathStr) ) {
 					std::cout << "process_index_file -> skipping indexed path: " << pathStr << "\n";
 				} else if ( vc.open(pathStr) ) {
 					// Woohoo!!

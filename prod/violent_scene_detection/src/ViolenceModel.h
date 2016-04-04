@@ -58,6 +58,11 @@ public:
 	void index(VideoSetTarget target, std::string resourcePath, bool isViolent = true);
 
 	/**
+	 * Create a path suitable for using as the index key.
+	 */
+	std::string createIndexKey(boost::filesystem::path);
+
+	/**
 	 * Returns true if the file at the given path is indexed, false otherwise.
 	 */
 	bool isIndexed(VideoSetTarget target, boost::filesystem::path resourcePath);
@@ -68,9 +73,10 @@ public:
 	void train();
 
 	/**
-	 *
+	 * Predicts whether the file at the given path contains violent content.
+	 * It would be better if we could pass a frame difference or two frames here.
 	 */
-	void predict();
+	void predict(boost::filesystem::path filePath);
 
 	/**
 	 * Clear the data set objects and write empty data to store.

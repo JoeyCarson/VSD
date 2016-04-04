@@ -163,10 +163,24 @@ bool ViolenceModel::isIndexed(VideoSetTarget target, boost::filesystem::path res
 	std::map<std::string, time_t> *index = NULL;
 	resolveDataStructures(target, NULL, NULL, &index);
 
-	boost::filesystem::path absolutePath( boost::filesystem::absolute(resourcePath) );
-	bool is = index ? index->find( absolutePath.generic_string() ) != index->end() : false;
+	boost::filesystem::path absolutePath = boost::filesystem::absolute(resourcePath);
+	std::string indexKey = createIndexKey(absolutePath);
+
+	bool is = index ? index->find( indexKey ) != index->end() : false;
 	//std::cout<<"isIndexed: " << is << " path: " << absolutePath.generic_string() << "\n";
 	return is;
+}
+
+std::string ViolenceModel::createIndexKey(boost::filesystem::path resourcePath)
+{
+	try {
+		resourcePath = boost::filesystem::canonical(resourcePath);
+	} catch ( boost::filesystem::filesystem_error &error ) {
+		std::cout << "isIndexed -> assuming path is OpenCV wildcard string.  resourcePath couldn't be canonicalized: " << error.what() <<"\n";
+		// Oh well.  Resource path may not exist.
+	}
+
+	return resourcePath.generic_string();
 }
 
 std::vector<cv::Mat> ViolenceModel::extractFeatures(std::string resourcePath)
@@ -257,6 +271,11 @@ void ViolenceModel::train()
 	learningKernel.train(trainingExampleStore, cv::ml::ROW_SAMPLE, trainingClassStore);
 }
 
+//void ViolenceModel::predict()
+//{
+//
+//}
+
 std::vector<cv::Mat> ViolenceModel::buildSample(std::vector<ImageBlob> blobs)
 {
 	assert(blobs.size() == GRACIA_K);
@@ -342,6 +361,7 @@ bool ViolenceModel::resolveDataStructures(VideoSetTarget target, cv::Mat **examp
 void ViolenceModel::addSample(VideoSetTarget target, boost::filesystem::path path, std::vector<cv::Mat> sample, bool isViolent)
 {
 	boost::filesystem::path absolutePath = boost::filesystem::absolute(path);
+
 	if ( !isIndexed( target, absolutePath ) )
 	{
 
@@ -378,8 +398,9 @@ void ViolenceModel::addSample(VideoSetTarget target, boost::filesystem::path pat
 
 				// Hash the modification date.
 				time_t modDate = boost::filesystem::last_write_time(absolutePath);
-				(*indexCache)[absolutePath.generic_string()] = modDate;
+				(*indexCache)[ createIndexKey(absolutePath) ] = modDate;
 				//std::cout << "path: " << absolutePath.generic_string() << " " << modDate << "\n";
+				//persistStore();
 			}
 		}
 	}

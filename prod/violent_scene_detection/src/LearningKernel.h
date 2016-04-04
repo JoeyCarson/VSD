@@ -29,6 +29,11 @@ public:
 	 */
 	void train(cv::Mat trainingSet, int layout, cv::Mat response);
 
+	/**
+	 * Runs the classifier.
+	 */
+	void predict();
+
 private:
 	std::string statModelPath;
 	cv::Ptr<cv::ml::RTrees> m_pTrees;
