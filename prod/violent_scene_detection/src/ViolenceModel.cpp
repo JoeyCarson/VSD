@@ -151,8 +151,12 @@ void ViolenceModel::index(VideoSetTarget target, std::string resourcePath, bool 
 {
 	boost::filesystem::path path(resourcePath);
 	if ( !isIndexed(target, path) ) {
-		std::vector<cv::Mat> trainingSample = extractFeatures(resourcePath);
+
+		// Create a VideoCapture instance bound to the path.
+		cv::VideoCapture capture(resourcePath);
+		std::vector<cv::Mat> trainingSample = extractFeatures(capture, resourcePath);
 		addSample(target, path, trainingSample, isViolent);
+
 	} else {
 		std::cout << "index -> skipping indexed path: " << resourcePath << "\n";
 	}
@@ -183,11 +187,9 @@ std::string ViolenceModel::createIndexKey(boost::filesystem::path resourcePath)
 	return resourcePath.generic_string();
 }
 
-std::vector<cv::Mat> ViolenceModel::extractFeatures(std::string resourcePath)
+std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, std::string resourcePath, uint frameCount)
 {
 
-	// Create a VideoCapture instance bound to the path.
-	cv::VideoCapture capture(resourcePath);
 	cv::Mat currentFrame, prevFrame;
 
 	// Create a max heap for keeping track of the largest blobs.
@@ -199,12 +201,12 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(std::string resourcePath)
 
 	// Load the prev frame with the first frame and current with the second
 	// so that we can simply loop and compute.
-	for ( uint i = 0, capPrevSuccess = capture.read(prevFrame), capCurrSuccess = capture.read(currentFrame);
-		  capPrevSuccess && capCurrSuccess;
-		  prevFrame = currentFrame, capCurrSuccess = capture.read(currentFrame), i++ )
+	for ( uint frameIndex = 0, capPrevSuccess = capture.read(prevFrame), capCurrSuccess = capture.read(currentFrame);
+		  capPrevSuccess && capCurrSuccess && (frameCount == 0 || frameIndex < frameCount);
+		  prevFrame = currentFrame, capCurrSuccess = capture.read(currentFrame), frameIndex++ )
 	{
 		// Convert to grayscale.
-		if ( i == 0 ) {
+		if ( frameIndex == 0 ) {
 			cv::Mat grayOut;
 			// It's only necessary to gray scale filter the previous frame on the first iteration,
 			// as each time the current frame will be equal to the prev frame, which was already filtered.
@@ -225,8 +227,8 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(std::string resourcePath)
 		// Output binAbsDiff for debug purposes.
 		boost::filesystem::path bpath(resourcePath);
 		std::stringstream frameName;
-		frameName << "bin_abs_diff_" << bpath.stem().string() << "_" << i;
-		ImageUtil::dumpDebugImage(binAbsDiff, frameName.str());
+		frameName << "bin_abs_diff_" << bpath.stem().string() << "_" << frameIndex;
+		//ImageUtil::dumpDebugImage(binAbsDiff, frameName.str());
 
 		// Find the contours (blobs) and use them to compute centroids, area, etc.
 		// http://opencv.itseez.com/2.4/doc/tutorials/imgproc/shapedescriptors/moments/moments.html?highlight=moment#code
