@@ -31,8 +31,14 @@ public:
 
 	/**
 	 * Runs the classifier.
+	 * Make a prediction based on the given samples.
+	 * @param samples - A matrix of samples (rows).
+	 * @param predictions - The output matrix of predictions.
+	 * 						Results are interpreted according to the underlying algorithm used.
 	 */
-	void predict();
+	void predict( cv::InputArray samples,cv::OutputArray predictions );
+
+	void persist();
 
 private:
 	std::string statModelPath;

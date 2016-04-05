@@ -187,7 +187,7 @@ std::string ViolenceModel::createIndexKey(boost::filesystem::path resourcePath)
 	return resourcePath.generic_string();
 }
 
-std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, std::string resourcePath, uint frameCount)
+std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, std::string sequenceName, const uint frameCount)
 {
 
 	cv::Mat currentFrame, prevFrame;
@@ -199,10 +199,12 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 	bool capPrevSuccess = false;
 	bool capCurrSuccess = false;
 
+	// TODO: Should we need to try to open the capture if it's not?
+
 	// Load the prev frame with the first frame and current with the second
 	// so that we can simply loop and compute.
 	for ( uint frameIndex = 0, capPrevSuccess = capture.read(prevFrame), capCurrSuccess = capture.read(currentFrame);
-		  capPrevSuccess && capCurrSuccess && (frameCount == 0 || frameIndex < frameCount);
+		  capPrevSuccess && capCurrSuccess && (frameCount == 0 || frameIndex < ( frameCount - 1 ) );
 		  prevFrame = currentFrame, capCurrSuccess = capture.read(currentFrame), frameIndex++ )
 	{
 		// Convert to grayscale.
@@ -225,7 +227,7 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		cv::threshold ( absDiff, binAbsDiff, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU );
 
 		// Output binAbsDiff for debug purposes.
-		boost::filesystem::path bpath(resourcePath);
+		boost::filesystem::path bpath(sequenceName);
 		std::stringstream frameName;
 		frameName << "bin_abs_diff_" << bpath.stem().string() << "_" << frameIndex;
 		//ImageUtil::dumpDebugImage(binAbsDiff, frameName.str());
@@ -256,6 +258,13 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		}
 	}
 
+	// If for whatever reason, enough blobs weren't found and added into the heap,
+	// load up blank ImageBlobs just to fill out the vector.
+	while ( topBlobsHeap.size() < GRACIA_K) {
+		std::cout << "Adding blank ImageBlob to top blobs heap.\n";
+		topBlobsHeap.emplace(ImageBlob());
+	}
+
 	// Read the ordered blobs back as an ordered list.
 	std::vector<ImageBlob> blobs;
 	while ( !topBlobsHeap.empty() ) {
@@ -273,10 +282,32 @@ void ViolenceModel::train()
 	learningKernel.train(trainingExampleStore, cv::ml::ROW_SAMPLE, trainingClassStore);
 }
 
-//void ViolenceModel::predict()
-//{
-//
-//}
+void ViolenceModel::predict(boost::filesystem::path filePath)
+{
+	cv::VideoCapture cap;
+
+	if ( cap.open( filePath.generic_string() ) ) {
+
+		const uint framesPerExtraction = 20;
+
+		// Try to predict across 120 frames each time until the capture is empty.
+		for ( double totalFrames = cap.get(CV_CAP_PROP_FRAME_COUNT); totalFrames > 0; totalFrames -= framesPerExtraction )
+		{
+			cv::Mat response;
+			std::vector<cv::Mat> featureRowVector = extractFeatures(cap, "prediction", framesPerExtraction);
+			learningKernel.predict(featureRowVector[0], response);
+
+			std::cout << "learning kernel predicted: " << response << "\n";
+		}
+
+	} else {
+
+		std::cout << "predict -> unable to open " << filePath << " for capture. \n";
+
+	}
+
+}
+
 
 std::vector<cv::Mat> ViolenceModel::buildSample(std::vector<ImageBlob> blobs)
 {

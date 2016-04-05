@@ -43,12 +43,25 @@ void LearningKernel::train(cv::Mat trainingSet, int layout, cv::Mat response)
 	}
 
 	m_pTrees->train(trainingSet, layout, response);
+	persist();
 	//std::cout << "yay!! not crashing anymore!!" << "\n";
 }
 
-LearningKernel::~LearningKernel() {
-	if ( m_pTrees && !m_pTrees->empty() && m_pTrees->isTrained() ) {
-		m_pTrees->save(statModelPath);
+void LearningKernel::predict( cv::InputArray samples,cv::OutputArray predictions )
+{
+	if ( m_pTrees ) {
+		m_pTrees->predict(samples, predictions);
 	}
+}
+
+void LearningKernel::persist()
+{
+	if ( m_pTrees && !m_pTrees->empty() && m_pTrees->isTrained() ) {
+			m_pTrees->save(statModelPath);
+	}
+}
+
+LearningKernel::~LearningKernel() {
+	persist();
 }
 

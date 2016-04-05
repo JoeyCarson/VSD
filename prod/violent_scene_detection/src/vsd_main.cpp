@@ -11,6 +11,7 @@
 
  // Path to index file.
 static boost::filesystem::path indexFilePath;
+static boost::filesystem::path predictionFilePath;
 
 // Parses the input file and indexes the paths if they're valid.
 bool process_index_file(boost::filesystem::path path, ViolenceModel &model);
@@ -26,7 +27,7 @@ option::ArgStatus checkFileArg(const option::Option& option, bool msg);
   {INDEX_FILE, 0, "f", "index-file", &checkFileArg,     "--index-file, -f <file_path>  Index the videos specified in file." },
   {TRAIN,      0, "t", "train",      option::Arg::None, "--train, -t  Train the model with the existing index." },
   {CLEAR,      0, "c", "clear",      option::Arg::None, "--clear, -c  Clear the index store before respecting any other options." },
-  {PREDICT,    0, "p", "predict",    option::Arg::None, "--predict, -p <file_path> Use the learned model to predict violent content in the video at <file_path>." },
+  {PREDICT,    0, "p", "predict",    &checkFileArg, "--predict, -p <file_path> Use the learned model to predict violent content in the video at <file_path>." },
   {0,0,0,0,0,0}
  };
 
@@ -64,7 +65,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	if ( options[PREDICT] ) {
-
+		std::string predictArg = options[PREDICT].arg;
+		vm.predict(predictArg);
 	}
 
     return 0;
@@ -162,12 +164,22 @@ bool process_index_file(boost::filesystem::path path, ViolenceModel &model)
 
 option::ArgStatus checkFileArg(const option::Option& option, bool msg)
 {
+	std::cout <<"option " << option.name << "\n";
+
+	// Determine which filePath we want to populate.
+	boost::filesystem::path *filePath;
+	if ( option.index() == INDEX_FILE ) {
+		filePath = &indexFilePath;
+	} else if ( option.index() == PREDICT  ) {
+		filePath = &predictionFilePath;
+	}
+
 	// Only set the input file path if it hasn't been set yet and the argument isn't empty.
-	if ( strcmp(option.arg, "") != 0 && indexFilePath.empty() ) {
-		boost::filesystem::path filePath = boost::filesystem::absolute(option.arg);
-		if ( boost::filesystem::exists(filePath) ) {
-			std::cout << "consumed file argument: "<< filePath << "\n";
-			indexFilePath = filePath;
+	if ( strcmp(option.arg, "") != 0 && filePath->empty() ) {
+		boost::filesystem::path tmpPath = boost::filesystem::absolute(option.arg);
+		if ( boost::filesystem::exists(tmpPath) ) {
+			std::cout << "consumed file argument: "<< filePath->generic_string() << "\n";
+			*filePath = tmpPath;
 			return option::ARG_OK;
 		}
 	}
@@ -180,3 +192,5 @@ option::ArgStatus checkFileArg(const option::Option& option, bool msg)
 
 	return option::ARG_ILLEGAL;
 }
+
+

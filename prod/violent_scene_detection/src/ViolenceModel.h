@@ -47,7 +47,7 @@ public:
 	 * This path must be compliant for constructing a cv::VideoCapture object (e.g. points to a
 	 * video file that contains a supported codec video stream).
 	 */
-	std::vector<cv::Mat> extractFeatures(cv::VideoCapture capture, std::string resourcePath = "", uint frameCount = 0);
+	std::vector<cv::Mat> extractFeatures(cv::VideoCapture capture, std::string sequenceName = "", uint frameCount = 0);
 
 	/**
 	 * Index the resource in the file system represented by resourcePath into the training store.

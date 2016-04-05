@@ -25,7 +25,7 @@ std::vector<cv::Point> ImageBlob::points() const
 
 double ImageBlob::area() const
 {
-	return cv::contourArea(m_points);
+	return m_points.empty() ? 0 : cv::contourArea(m_points);
 }
 
 cv::Point2f ImageBlob::centroid() const
