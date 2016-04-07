@@ -20,7 +20,7 @@ bool process_index_file(boost::filesystem::path path, ViolenceModel &model);
 option::ArgStatus checkFileArg(const option::Option& option, bool msg);
 
 // http://optionparser.sourceforge.net/
- enum  optionIndex { UNKNOWN, INDEX_FILE, TRAIN, CLEAR, PREDICT };
+ enum  optionIndex { UNKNOWN, INDEX_FILE, TRAIN, CLEAR, PREDICT, ERROR };
  const option::Descriptor usage[] =
  {
   {UNKNOWN,    0, "",  "",			 option::Arg::None, "USAGE: example [options]\n\n""Options:" },
@@ -28,6 +28,7 @@ option::ArgStatus checkFileArg(const option::Option& option, bool msg);
   {TRAIN,      0, "t", "train",      option::Arg::None, "--train, -t  Train the model with the existing index." },
   {CLEAR,      0, "c", "clear",      option::Arg::None, "--clear, -c  Clear the index store before respecting any other options." },
   {PREDICT,    0, "p", "predict",    &checkFileArg, "--predict, -p <file_path> Use the learned model to predict violent content in the video at <file_path>." },
+  {ERROR,      0, "e", "error",      option::Arg::None, "--error, -e Compute the training, cross validation, and testing error." },
   {0,0,0,0,0,0}
  };
 
@@ -64,9 +65,15 @@ int main(int argc, char* argv[]) {
 		vm.train();
 	}
 
+	if (options[ERROR] || options[TRAIN] ) {
+		vm.computeError(ViolenceModel::TRAINING);
+		vm.computeError(ViolenceModel::X_VALIDATION);
+		vm.computeError(ViolenceModel::TESTING);
+	}
+
 	if ( options[PREDICT] ) {
 		std::string predictArg = options[PREDICT].arg;
-		vm.predict(predictArg);
+		vm.predict(predictArg, 1);
 	}
 
     return 0;
@@ -148,7 +155,7 @@ bool process_index_file(boost::filesystem::path path, ViolenceModel &model)
 				//       Since these strings are more difficult to parse, we can simply attempt a file open first.
 				//       That way the file path can be compatible with this feature as well.  Hopefully this isn't too expensive.
 				if ( model.isIndexed(target, pathStr) ) {
-					std::cout << "process_index_file -> skipping indexed path: " << pathStr << "\n";
+					//std::cout << "process_index_file -> skipping indexed path: " << pathStr << "\n";
 				} else if ( vc.open(pathStr) ) {
 					// Woohoo!!
 					model.index(target, pathStr, isViolent);

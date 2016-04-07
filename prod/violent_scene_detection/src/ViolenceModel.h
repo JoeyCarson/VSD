@@ -73,10 +73,12 @@ public:
 	void train();
 
 	/**
-	 * Predicts whether the file at the given path contains violent content.
-	 * It would be better if we could pass a frame difference or two frames here.
+	 * Predicts whether the file at the given path contains violent content across the given time interval.
+	 * The prediction algorithm is run across all frames in the given interval throughout the duration of the video.
+	 * @param filePath - The path of the vide file.
+	 * @param timeInterval - The span of time in seconds used for each prediction.  The default is one second.
 	 */
-	void predict(boost::filesystem::path filePath);
+	void predict(boost::filesystem::path filePath, float timeInterval = 1);
 
 	/**
 	 * Clear the data set objects and write empty data to store.
@@ -88,6 +90,16 @@ public:
 	 * Note that when a lot of videos are indexed, this call is probably NOT cheap.
 	 */
 	void persistStore();
+
+	/**
+	 * Compute the error for the associated target.
+	 */
+	double computeError(VideoSetTarget target);
+
+	/**
+	 *
+	 */
+	static std::string targetToString(VideoSetTarget target);
 
 private:
 

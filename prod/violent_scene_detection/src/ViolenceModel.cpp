@@ -49,32 +49,71 @@ ViolenceModel::ViolenceModel(std::string trainingStorePath)
 	storeInit();
 }
 
+double ViolenceModel::computeError(VideoSetTarget target)
+{
+	// Compute the MSE for the target dataset when applying it to the trained model.
+	cv::Mat *exampleStore, *classStore, predictedClasses, diff;
+	resolveDataStructures(target, &exampleStore, &classStore, NULL);
+
+	// Evaluate the examples against the trained model.
+	learningKernel.predict(*exampleStore, predictedClasses);
+
+	cv::Scalar mean;
+	if ( classStore->size() == predictedClasses.size() ) {
+		// Ensure that the matrices have compatible types.
+		predictedClasses.convertTo(predictedClasses, CV_32S);
+		//std::cout << "classStore type: " << classStore->type() << " predictedClasses type: " << predictedClasses.type() <<"\n";
+
+		// Compute the absolute difference between the stored classes (ground truth) and the predicted classes.
+		cv::absdiff(*classStore, predictedClasses, diff);
+		diff.mul(diff);
+		mean = cv::mean(diff);
+	} else std::cout << "computeError -> class vectors are not compatible " << "predictedClasses: " << predictedClasses.size() << " classStore: " << classStore->size() << ".\n";
+
+	std::cout << "computeError: " << targetToString(target) << ": " << mean << "\n";
+	return mean[0];
+}
+
+std::string ViolenceModel::targetToString(VideoSetTarget target)
+{
+	std::string targetStr;
+
+	switch (target)
+	{
+		case ViolenceModel::TRAINING: targetStr = "Training"; break;
+		case ViolenceModel::X_VALIDATION: targetStr = "Cross Validation"; break;
+		case ViolenceModel::TESTING: targetStr = "Testing"; break;
+		default: targetStr = "Unknown";
+	}
+
+	return targetStr;
+}
+
 void ViolenceModel::clear()
 {
 	std::cout << "Clearing the model index store.\n";
-	cv::Mat *exampleStore;
-	cv::Mat *classStore;
+	cv::Mat *exampleStore, *classStore;
 	std::map<std::string, time_t> *indexCache;
 
 	// TODO: Can't we do this in a loop?
 	resolveDataStructures(ViolenceModel::TRAINING, &exampleStore, &classStore, &indexCache);
 	if ( exampleStore && classStore && indexCache) {
 		exampleStore->create(0, 0, CV_32F);
-		classStore->create(0, 0, CV_32F);
+		classStore->create(0, 0, CV_32S);
 		indexCache->clear();
 	}
 
 	resolveDataStructures(ViolenceModel::X_VALIDATION, &exampleStore, &classStore, &indexCache);
 	if ( exampleStore && classStore && indexCache) {
 		exampleStore->create(0, 0, CV_32F);
-		classStore->create(0, 0, CV_32F);
+		classStore->create(0, 0, CV_32S);
 		indexCache->clear();
 	}
 
 	resolveDataStructures(ViolenceModel::TESTING, &exampleStore, &classStore, &indexCache);
 	if ( exampleStore && classStore && indexCache) {
 		exampleStore->create(0, 0, CV_32F);
-		classStore->create(0, 0, CV_32F);
+		classStore->create(0, 0, CV_32S);
 		indexCache->clear();
 	}
 
@@ -94,7 +133,7 @@ void ViolenceModel::storeInit()
 	cv::Mat *classStore;
 	std::map<std::string, time_t> *indexCache;
 
-	std::cout << "initializing ViolenceModel storage structures.";
+	std::cout << "initializing ViolenceModel storage structures.\n";
 
 	// Initialize the training set from the file.
 	resolveDataStructures(ViolenceModel::TRAINING, &exampleStore, &classStore, &indexCache);
@@ -180,7 +219,7 @@ std::string ViolenceModel::createIndexKey(boost::filesystem::path resourcePath)
 	try {
 		resourcePath = boost::filesystem::canonical(resourcePath);
 	} catch ( boost::filesystem::filesystem_error &error ) {
-		std::cout << "isIndexed -> assuming path is OpenCV wildcard string.  resourcePath couldn't be canonicalized: " << error.what() <<"\n";
+		std::cout << "createIndexKey -> assuming path is OpenCV wildcard string.  resourcePath couldn't be canonicalized: " << error.what() <<"\n";
 		// Oh well.  Resource path may not exist.
 	}
 
@@ -220,6 +259,10 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		cv::Mat currentOut;
 		cv::cvtColor(currentFrame, currentOut, CV_RGB2GRAY);
 		currentFrame = currentOut;
+
+		// All videos must be commonly sized.
+		cv::resize(prevFrame, prevFrame, cv::Size(320,240));
+		cv::resize(currentFrame, currentFrame, cv::Size(320,240));
 
 		// Compute absolute binarized difference.
 		cv::Mat absDiff, binAbsDiff;
@@ -282,30 +325,26 @@ void ViolenceModel::train()
 	learningKernel.train(trainingExampleStore, cv::ml::ROW_SAMPLE, trainingClassStore);
 }
 
-void ViolenceModel::predict(boost::filesystem::path filePath)
+void ViolenceModel::predict(boost::filesystem::path filePath, float timeInterval)
 {
 	cv::VideoCapture cap;
-
 	if ( cap.open( filePath.generic_string() ) ) {
 
-		const uint framesPerExtraction = 20;
-
-		// Try to predict across 120 frames each time until the capture is empty.
+		double frameRate = cap.get(CV_CAP_PROP_FPS);
+		const uint framesPerExtraction = frameRate * timeInterval;
+		// Try to predict across 20 frames each time until the capture is empty.
 		for ( double totalFrames = cap.get(CV_CAP_PROP_FRAME_COUNT); totalFrames > 0; totalFrames -= framesPerExtraction )
 		{
-			cv::Mat response;
+			cv::Mat output;
 			std::vector<cv::Mat> featureRowVector = extractFeatures(cap, "prediction", framesPerExtraction);
-			learningKernel.predict(featureRowVector[0], response);
+			float resp = learningKernel.predict(featureRowVector[0], output);
 
-			std::cout << "learning kernel predicted: " << response << "\n";
+			std::cout << "learning kernel -> predict returns: " << resp << " predicts: " << output << "\n";
 		}
 
 	} else {
-
 		std::cout << "predict -> unable to open " << filePath << " for capture. \n";
-
 	}
-
 }
 
 
@@ -417,7 +456,7 @@ void ViolenceModel::addSample(VideoSetTarget target, boost::filesystem::path pat
 					std::cout << "updating training store size. current: " << exampleStore->size() <<"\n";
 					// Create the training store with 0 rows of the training sample's width (column count).
 					exampleStore->create(0, v1Sample.size().width, CV_32F);
-					classStore->create(0, 1, CV_32F);
+					classStore->create(0, 1, CV_32S);
 					std::cout << "new exampleStore size: " << exampleStore->size() << " classStore size:" << classStore->size() <<"\n";
 				}
 
@@ -425,7 +464,7 @@ void ViolenceModel::addSample(VideoSetTarget target, boost::filesystem::path pat
 				exampleStore->push_back(v1Sample);
 
 				// Add the class (true or false) to the training class store.
-				cv::Mat classMat = (cv::Mat_<float>(1,1) << (float)isViolent);
+				cv::Mat classMat = (cv::Mat_<int>(1,1) << (int)isViolent);
 				classStore->push_back(classMat);
 				std::cout<<"exampleStore size after add: " << exampleStore->size() << " classStore size: " << classStore->size() <<"\n";
 

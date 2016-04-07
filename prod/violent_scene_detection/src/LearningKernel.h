@@ -18,7 +18,12 @@
 class LearningKernel {
 
 public:
-	LearningKernel(std::string modelPath = "default_stat_model.xml");
+
+	/**
+	 * Constructor.
+	 * @param modelPath - Path to the learning kernel data structures storage.
+	 */
+	LearningKernel(std::string modelPath = "./default_stat_model.xml");
 	virtual ~LearningKernel();
 
 	/**
@@ -33,11 +38,12 @@ public:
 	 * Runs the classifier.
 	 * Make a prediction based on the given samples.
 	 * @param samples - A matrix of samples (rows).
-	 * @param predictions - The output matrix of predictions.
-	 * 						Results are interpreted according to the underlying algorithm used.
 	 */
-	void predict( cv::InputArray samples,cv::OutputArray predictions );
+	float predict( cv::InputArray samples, cv::OutputArray out );
 
+	/**
+	 * Persist the learning kernel data structures.
+	 */
 	void persist();
 
 private:
