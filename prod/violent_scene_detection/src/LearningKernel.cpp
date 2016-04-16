@@ -15,16 +15,15 @@ LearningKernel::LearningKernel(std::string modelPath)
 {
 	if ( !m_pTrees ) {
 		m_pTrees = cv::ml::RTrees::create();
-		initRandomTrees();
 	}
 }
 
 void LearningKernel::initRandomTrees()
 {
-	m_pTrees->setMaxDepth(200);
+	m_pTrees->setMaxDepth(250);
 	m_pTrees->setMinSampleCount(5);
 
-	cv::TermCriteria criteria(cv::TermCriteria::EPS, 0, 0);
+	cv::TermCriteria criteria(cv::TermCriteria::EPS, 500, 0.001);
 	m_pTrees->setTermCriteria(criteria);
 	m_pTrees->setCalculateVarImportance(false);
 	m_pTrees->setRegressionAccuracy(0);
@@ -40,7 +39,10 @@ void LearningKernel::train(cv::Mat trainingSet, int layout, cv::Mat response)
 		return;
 	}
 
+	initRandomTrees();
+
 	std::cout << "train -> begin.\n";
+	m_pTrees->clear();
 	m_pTrees->train(trainingSet, layout, response);
 	persist();
 	std::cout << "train -> complete.\n";

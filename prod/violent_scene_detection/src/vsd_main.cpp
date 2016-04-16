@@ -1,6 +1,5 @@
 #include <iostream>
 #include <fstream>
-#include <ejdb/ejdb.h>
 
 #include <boost/foreach.hpp>
 #include <boost/algorithm/string.hpp>
@@ -8,6 +7,7 @@
 
 #include "optionparser.h"
 #include "ViolenceModel.h"
+#include "ImageUtil.h"
 
  // Path to index file.
 static boost::filesystem::path indexFilePath;
@@ -27,7 +27,7 @@ option::ArgStatus checkFileArg(const option::Option& option, bool msg);
   {INDEX_FILE, 0, "f", "index-file", &checkFileArg,     "--index-file, -f <file_path>  Index the videos specified in file." },
   {TRAIN,      0, "t", "train",      option::Arg::None, "--train, -t  Train the model with the existing index." },
   {CLEAR,      0, "c", "clear",      option::Arg::None, "--clear, -c  Clear the index store before respecting any other options." },
-  {PREDICT,    0, "p", "predict",    &checkFileArg, "--predict, -p <file_path> Use the learned model to predict violent content in the video at <file_path>." },
+  {PREDICT,    0, "p", "predict",    &checkFileArg,     "--predict, -p <file_path> Use the learned model to predict violent content in the video at <file_path>." },
   {ERROR,      0, "e", "error",      option::Arg::None, "--error, -e Compute the training, cross validation, and testing error." },
   {0,0,0,0,0,0}
  };

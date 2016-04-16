@@ -43,6 +43,10 @@
 // This is just a suitable default for now.  Eventually, this should be made configurable.
 const uint GRACIA_K = 8;
 
+
+const uint TARGET_COMMON_WIDTH = 320;
+const uint TARGET_COMMON_HEIGHT = 240;
+
 ViolenceModel::ViolenceModel(std::string trainingStorePath)
 : trainingStorePath(trainingStorePath)
 {
@@ -57,6 +61,8 @@ double ViolenceModel::computeError(VideoSetTarget target)
 
 	// Evaluate the examples against the trained model.
 	learningKernel.predict(*exampleStore, predictedClasses);
+
+	//std::cout << "learning kernel class predictions: \n" << predictedClasses << "\n";
 
 	cv::Scalar mean;
 	if ( classStore->size() == predictedClasses.size() ) {
@@ -246,6 +252,9 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		  capPrevSuccess && capCurrSuccess && (frameCount == 0 || frameIndex < ( frameCount - 1 ) );
 		  prevFrame = currentFrame, capCurrSuccess = capture.read(currentFrame), frameIndex++ )
 	{
+
+		cv::Size targetSize(TARGET_COMMON_WIDTH, TARGET_COMMON_HEIGHT);
+
 		// Convert to grayscale.
 		if ( frameIndex == 0 ) {
 			cv::Mat grayOut;
@@ -253,6 +262,10 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 			// as each time the current frame will be equal to the prev frame, which was already filtered.
 			cv::cvtColor(prevFrame, grayOut, CV_RGB2GRAY);
 			prevFrame = grayOut;
+			//prevFrame = ImageUtil::scaleImageIntoRect(prevFrame, targetSize);
+			//cv::imshow("first", prevFrame);
+			//cv::waitKey();
+
 		}
 
 		// Filter the current frame.
@@ -260,9 +273,10 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		cv::cvtColor(currentFrame, currentOut, CV_RGB2GRAY);
 		currentFrame = currentOut;
 
-		// All videos must be commonly sized.
-		cv::resize(prevFrame, prevFrame, cv::Size(320,240));
-		cv::resize(currentFrame, currentFrame, cv::Size(320,240));
+		// Scale to as close to target size as possible.
+		//currentFrame = ImageUtil::scaleImageIntoRect(currentFrame, targetSize);
+		//cv::imshow("current", currentFrame);
+		//cv::waitKey();
 
 		// Compute absolute binarized difference.
 		cv::Mat absDiff, binAbsDiff;
@@ -472,7 +486,7 @@ void ViolenceModel::addSample(VideoSetTarget target, boost::filesystem::path pat
 				time_t modDate = boost::filesystem::last_write_time(absolutePath);
 				(*indexCache)[ createIndexKey(absolutePath) ] = modDate;
 				//std::cout << "path: " << absolutePath.generic_string() << " " << modDate << "\n";
-				//persistStore();
+				persistStore();
 			}
 		}
 	}
