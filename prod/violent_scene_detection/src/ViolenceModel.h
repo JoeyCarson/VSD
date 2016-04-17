@@ -125,12 +125,12 @@ private:
 	LearningKernel learningKernel;
 
 	// Initialize all data sets from the file store.
-	void storeInit();
+	//void storeInit();
 
 	/**
 	 * Resolve the data structures that are associated with the given target.
 	 */
-	bool resolveDataStructures(VideoSetTarget target, cv::Mat **exampleStore, cv::Mat **classStore , std::map<std::string, time_t> **indexCache);
+	bool resolveDataStructures(VideoSetTarget target, cv::Mat **exampleStore = NULL, cv::Mat **classStore = NULL, std::map<std::string, time_t> **indexCache = NULL);
 
 
 	/**
