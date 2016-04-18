@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <signal.h>
 
 #include <boost/foreach.hpp>
 #include <boost/algorithm/string.hpp>
@@ -32,7 +33,21 @@ option::ArgStatus checkFileArg(const option::Option& option, bool msg);
   {0,0,0,0,0,0}
  };
 
+ViolenceModel vm;
+volatile sig_atomic_t processTerminated = 0;
+
+void terminated(int signum)
+{
+	std::cout << "Received SIGTERM \n";
+	processTerminated = 1;
+	//vm.persistStore();
+}
+
 int main(int argc, char* argv[]) {
+
+	struct sigaction action = {0};
+	action.sa_handler = terminated;
+	sigaction(SIGTERM, &action, NULL);
 
 	// Set up command line arg parser.
 	option::Stats  stats(usage, argc, argv);
@@ -50,8 +65,6 @@ int main(int argc, char* argv[]) {
 
 	if ( parser.error() ) return 1;
 
-	ViolenceModel vm;
-
 	if ( options[CLEAR] ) {
 		vm.clear();
 	}
@@ -61,17 +74,17 @@ int main(int argc, char* argv[]) {
 		return 2;
 	}
 
-	if ( options[TRAIN] ) {
+	if ( !processTerminated && options[TRAIN] ) {
 		vm.train();
 	}
 
-	if (options[ERROR] || options[TRAIN] ) {
+	if ( !processTerminated && (options[ERROR] || options[TRAIN]) ) {
 		vm.computeError(ViolenceModel::TRAINING);
 		vm.computeError(ViolenceModel::X_VALIDATION);
 		vm.computeError(ViolenceModel::TESTING);
 	}
 
-	if ( options[PREDICT] ) {
+	if ( !processTerminated && options[PREDICT] ) {
 		std::string predictArg = options[PREDICT].arg;
 		vm.predict(predictArg, 1);
 	}
@@ -93,7 +106,7 @@ bool process_index_file(boost::filesystem::path path, ViolenceModel &model)
 	// Check whether the string is compatible with our istream expectations.
 	const boost::regex e("^\\s*(([0-2]{1}\\s*[01][\\s.]*)|(#)).*$");
 
-	while ( std::getline(inFile, line) )
+	while ( !processTerminated && std::getline(inFile, line) )
 	{
 		lineNumber++;
 		line = boost::trim_copy(line);
@@ -149,18 +162,21 @@ bool process_index_file(boost::filesystem::path path, ViolenceModel &model)
 			}
 
 			BOOST_FOREACH(std::string pathStr, pathsToIndex) {
-				cv::VideoCapture vc;
-				// TODO: Many "videos" used in computer vision research are actually a shorthand format string given to opencv
-				//       that specifies the file name format (eg. img_%02d.jpg -> img_00.jpg, img_01.jpg, img_02.jpg, ...).
-				//       Since these strings are more difficult to parse, we can simply attempt a file open first.
-				//       That way the file path can be compatible with this feature as well.  Hopefully this isn't too expensive.
-				if ( model.isIndexed(target, pathStr) ) {
-					//std::cout << "process_index_file -> skipping indexed path: " << pathStr << "\n";
-				} else if ( vc.open(pathStr) ) {
-					// Woohoo!!
-					model.index(target, pathStr, isViolent);
-				} else {
-					std::cout << "couldn't open file for indexing.\n";
+				if ( !processTerminated ) {
+					cv::VideoCapture vc;
+					// TODO: Many "videos" used in computer vision research are actually a shorthand format string given to opencv
+					//       that specifies the file name format (eg. img_%02d.jpg -> img_00.jpg, img_01.jpg, img_02.jpg, ...).
+					//       Since these strings are more difficult to parse, we can simply attempt a file open first.
+					//       That way the file path can be compatible with this feature as well.  Hopefully this isn't too expensive.
+					if ( model.isIndexed(target, pathStr) ) {
+						//std::cout << "process_index_file -> skipping indexed path: " << pathStr << "\n";
+					} else if ( vc.open(pathStr) ) {
+						// Woohoo!!
+						model.index(target, pathStr, isViolent);
+						model.persistStore();
+					} else {
+						std::cout << "couldn't open file for indexing.\n";
+					}
 				}
 			}
 		}

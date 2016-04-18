@@ -124,19 +124,16 @@ private:
 	// ML Kernel.
 	LearningKernel learningKernel;
 
-	// Initialize all data sets from the file store.
-	//void storeInit();
-
 	/**
 	 * Resolve the data structures that are associated with the given target.
 	 */
-	bool resolveDataStructures(VideoSetTarget target, cv::Mat **exampleStore = NULL, cv::Mat **classStore = NULL, std::map<std::string, time_t> **indexCache = NULL);
+	bool resolveDataStructures(VideoSetTarget target, cv::Mat **exampleStore = NULL, cv::Mat **classStore = NULL, std::map<std::string, time_t> **indexCache = NULL, bool readFileIfEmpty = true);
 
 
 	/**
 	 * Initialize the given data structures from the file storage object.
 	 */
-	static void storeInit(cv::FileStorage file, std::string exampleStoreName, cv::Mat &exampleStore,
+	static void storeInit(cv::FileStorage &file, std::string exampleStoreName, cv::Mat &exampleStore,
 										 	    std::string classStoreName,   cv::Mat &classStore,
 												std::string indexCacheName,   std::map<std::string, time_t> &indexCache);
 
@@ -152,12 +149,6 @@ private:
 	 * training store.
 	 */
 	void addSample(VideoSetTarget target, boost::filesystem::path p, std::vector<cv::Mat> trainingSample, bool isViolent);
-
-	/**
-	 * Add the sample data to the
-	 */
-	static void updateStore(boost::filesystem::path filePath, cv::Mat inputSample,
-							cv::Mat &exampleStore, cv::Mat &classStore, std::map<std::string, time_t> &indexCache);
 
 	/**
 	 * Store the examples, classes, and indexes in the given file.

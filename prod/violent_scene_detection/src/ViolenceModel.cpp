@@ -126,50 +126,9 @@ void ViolenceModel::clear()
 	persistStore();
 }
 
-//void ViolenceModel::storeInit()
-//{
-//	cv::FileStorage file;
-//	bool trainingStoreOpenSuccess = file.open(trainingStorePath, cv::FileStorage::READ);
-//	if (!trainingStoreOpenSuccess) {
-//		std::cout << "Failed opening training store at " << trainingStorePath << "\n";
-//		return;
-//	}
-//
-//	cv::Mat *exampleStore;
-//	cv::Mat *classStore;
-//	std::map<std::string, time_t> *indexCache;
-//
-//	std::cout << "initializing ViolenceModel storage structures.\n";
-//
-//	// Initialize the training set from the file.
-//	resolveDataStructures(ViolenceModel::TRAINING, &exampleStore, &classStore, &indexCache);
-//	if ( exampleStore && classStore && indexCache ) {
-//		storeInit(file, VIOLENCE_MODEL_TRAINING_SET, *exampleStore,
-//						VIOLENCE_MODEL_TRAINING_SET_CLASSES, *classStore,
-//						VIOLENCE_MODEL_TRAINING_FILE_PATHS, *indexCache);
-//	}
-//
-//	// Initialize the training set from the file.
-//	resolveDataStructures(ViolenceModel::X_VALIDATION, &exampleStore, &classStore, &indexCache);
-//	if ( exampleStore && classStore && indexCache ) {
-//		storeInit(file, VIOLENCE_MODEL_XVAL_SET, *exampleStore,
-//						VIOLENCE_MODEL_XVAL_SET_CLASSES, *classStore,
-//						VIOLENCE_MODEL_XVAL_FILE_PATHS, *indexCache);
-//	}
-//
-//	// Initialize the training set from the file.
-//	resolveDataStructures(ViolenceModel::TESTING, &exampleStore, &classStore, &indexCache);
-//	if ( exampleStore && classStore && indexCache ) {
-//		storeInit(file, VIOLENCE_MODEL_TEST_SET, *exampleStore,
-//						VIOLENCE_MODEL_TEST_SET_CLASSES, *classStore,
-//						VIOLENCE_MODEL_TEST_FILE_PATHS, *indexCache);
-//	}
-//
-//}
-
-void ViolenceModel::storeInit(cv::FileStorage file, std::string exampleStoreName, cv::Mat &exampleStore,
-													std::string classStoreName, cv::Mat &classStore,
-													std::string indexCacheName, std::map<std::string, time_t> &indexCache)
+void ViolenceModel::storeInit(cv::FileStorage &file, std::string exampleStoreName, cv::Mat &exampleStore,
+													 std::string classStoreName, cv::Mat &classStore,
+													 std::string indexCacheName, std::map<std::string, time_t> &indexCache)
 {
 	// Read the data structures in from the training store.
 	file[exampleStoreName] >> exampleStore;
@@ -183,12 +142,14 @@ void ViolenceModel::storeInit(cv::FileStorage file, std::string exampleStoreName
 	while ( iter != end )
 	{
 		std::string path = (*iter)[VIOLENCE_MODEL_TRAINING_EXAMPLE_PATH];
+		//std::cout << "found path: " << path << "\n";
 		int modTime = (int)(*iter)[VIOLENCE_MODEL_TRAINING_EXAMPLE_MOD_DATE];
 		indexCache[path] = (time_t)modTime;
 		iter++;
 	}
 
 	// Ensure we go no further the height (rows) are not equivalent.
+	std::cout << "classes: " << classStore.size().height << " examples: " << exampleStore.size().height << " indices: " << indexCache.size() << "\n";
 	assert(classStore.size().height == exampleStore.size().height && classStore.size().height == indexCache.size());
 }
 
@@ -401,7 +362,7 @@ std::vector<cv::Mat> ViolenceModel::buildSample(std::vector<ImageBlob> blobs)
 	return retVect;
 }
 
-bool ViolenceModel::resolveDataStructures(VideoSetTarget target, cv::Mat **exampleStore, cv::Mat **classStore , std::map<std::string, time_t> **indexCache)
+bool ViolenceModel::resolveDataStructures(VideoSetTarget target, cv::Mat **exampleStore, cv::Mat **classStore , std::map<std::string, time_t> **indexCache, bool readFileIfEmpty)
 {
 	bool successfullyResolved = true;
 	// Training Set Data Structures.
@@ -452,16 +413,16 @@ bool ViolenceModel::resolveDataStructures(VideoSetTarget target, cv::Mat **examp
 	// be in sync with one another.
 	// TODO: It would be great to hide all of this functionality in a base class so there is no temptation to grab a hold
 	// 		 of any structures without properly pulling from this method.
-	if ( successfullyResolved && (examples->empty() || classes->empty() || index->empty()) ) {
+	if ( successfullyResolved && readFileIfEmpty && (examples->empty() || classes->empty() || index->empty()) ) {
 
 		cv::FileStorage file;
 		std::cout << "initializing data structures for target: " << ViolenceModel::targetToString(target) << "\n";
 
 		bool trainingStoreOpenSuccess = file.open(trainingStorePath, cv::FileStorage::READ);
 		if (trainingStoreOpenSuccess) {
-			storeInit(file, VIOLENCE_MODEL_TRAINING_SET, *examples,
-							VIOLENCE_MODEL_TRAINING_SET_CLASSES, *classes,
-							VIOLENCE_MODEL_TRAINING_FILE_PATHS, *index);
+			storeInit(file, exampleStoreName, *examples,
+							classStoreName, *classes,
+							indexStoreName, *index);
 		} else {
 			std::cout << "Failed opening training store at " << trainingStorePath << "\n";
 		}
@@ -517,7 +478,7 @@ void ViolenceModel::addSample(VideoSetTarget target, boost::filesystem::path pat
 				time_t modDate = boost::filesystem::last_write_time(absolutePath);
 				(*indexCache)[ createIndexKey(absolutePath) ] = modDate;
 				//std::cout << "path: " << absolutePath.generic_string() << " " << modDate << "\n";
-				persistStore();
+				//persistStore();
 			}
 		}
 	}
@@ -527,15 +488,15 @@ void ViolenceModel::persistStore()
 {
 	cv::Mat *trEx, *trCl;
 	std::map<std::string, time_t> *trInd;
-	resolveDataStructures(ViolenceModel::TRAINING, &trEx, &trCl, &trInd);
+	resolveDataStructures(ViolenceModel::TRAINING, &trEx, &trCl, &trInd, false);
 
 	cv::Mat *xvEx, *xvCl;
 	std::map<std::string, time_t> *xvInd;
-	resolveDataStructures(ViolenceModel::X_VALIDATION, &xvEx, &xvCl, &xvInd);
+	resolveDataStructures(ViolenceModel::X_VALIDATION, &xvEx, &xvCl, &xvInd, false);
 
 	cv::Mat *tstEx, *tstCl;
 	std::map<std::string, time_t> *tstInd;
-	resolveDataStructures(ViolenceModel::TESTING, &tstEx, &tstCl, &tstInd);
+	resolveDataStructures(ViolenceModel::TESTING, &tstEx, &tstCl, &tstInd, false);
 
 	cv::FileStorage file;
 	// Open the training store file for write and write it.
