@@ -58,6 +58,18 @@ public:
 	void index(VideoSetTarget target, std::string resourcePath, bool isViolent = true);
 
 	/**
+	 * Returns the number of indexed samples for the given target type.
+	 */
+	uint size(VideoSetTarget target);
+
+	/**
+	 * Returns a binary matrix representing whether or not the example at index was predicted correctly.
+	 * @param target - The dataset to evaluate the results of.
+	 * @param positive - Whether to detect true positives or true negatives.
+	 */
+	cv::Mat trueResults(VideoSetTarget target, bool positive);
+
+	/**
 	 * Create a path suitable for using as the index key.
 	 */
 	std::string createIndexKey(boost::filesystem::path);

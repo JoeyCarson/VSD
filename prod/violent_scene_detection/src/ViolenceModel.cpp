@@ -53,6 +53,37 @@ ViolenceModel::ViolenceModel(std::string trainingStorePath)
 	//storeInit();
 }
 
+uint ViolenceModel::size(VideoSetTarget target)
+{
+	std::map<std::string, time_t> *targetIndex;
+	resolveDataStructures(target, NULL, NULL, &targetIndex);
+	return targetIndex ? targetIndex->size() : 0;
+}
+
+cv::Mat ViolenceModel::trueResults(VideoSetTarget target, bool positive)
+{
+	cv::Mat *exampleStore, *classStore, predictedClasses, ANDResult;
+
+	if ( learningKernel.isTrained() && resolveDataStructures(target, &exampleStore, &classStore, NULL) )
+	{
+		// Evaluate the examples against the trained model.
+		learningKernel.predict(*exampleStore, predictedClasses);
+
+		cv::Mat classStoreCopy(*classStore);
+		cv::Mat predictedClassesCopy(predictedClasses);
+
+		if ( !positive )
+		{
+			cv::bitwise_not(*classStore, classStoreCopy);
+			cv::bitwise_not(predictedClasses, predictedClassesCopy);
+		}
+
+		cv::bitwise_and(classStoreCopy, predictedClassesCopy, ANDResult);
+	}
+
+	return ANDResult;
+}
+
 double ViolenceModel::computeError(VideoSetTarget target)
 {
 	// Compute the MSE for the target dataset when applying it to the trained model.
@@ -336,8 +367,9 @@ std::vector<cv::Mat> ViolenceModel::buildSample(std::vector<ImageBlob> blobs)
 
 		ImageBlob bi = blobs[i];
 
-		// Add the area.
+		// Add the area and compactness.
 		v1ExampleVec.push_back( (float)bi.area() ); featureCount++;
+		v1ExampleVec.push_back( bi.compactness() ); featureCount++;
 
 		// Centroid x and y.
 		v1ExampleVec.push_back( bi.centroid().x ); featureCount++;
@@ -387,19 +419,19 @@ bool ViolenceModel::resolveDataStructures(VideoSetTarget target, cv::Mat **examp
 			examples = &testExampleStore;
 			classes = &testClassStore;
 			index = &testIndexCache;
-			exampleStoreName = VIOLENCE_MODEL_XVAL_SET;
-			classStoreName = VIOLENCE_MODEL_XVAL_SET_CLASSES;
-			indexStoreName = VIOLENCE_MODEL_XVAL_FILE_PATHS;
+			exampleStoreName = VIOLENCE_MODEL_TEST_SET;
+			classStoreName = VIOLENCE_MODEL_TEST_SET_CLASSES;
+			indexStoreName = VIOLENCE_MODEL_TEST_FILE_PATHS;
+
 			break;
 
 		case ViolenceModel::X_VALIDATION:
 			examples = &xvalExampleStore;
 			classes = &xvalClassStore;
 			index = &xvalIndexCache;
-			exampleStoreName = VIOLENCE_MODEL_TEST_SET;
-			classStoreName = VIOLENCE_MODEL_TEST_SET_CLASSES;
-			indexStoreName = VIOLENCE_MODEL_TEST_FILE_PATHS;
-
+			exampleStoreName = VIOLENCE_MODEL_XVAL_SET;
+			classStoreName = VIOLENCE_MODEL_XVAL_SET_CLASSES;
+			indexStoreName = VIOLENCE_MODEL_XVAL_FILE_PATHS;
 			break;
 
 		default: {

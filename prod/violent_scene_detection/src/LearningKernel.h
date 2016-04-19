@@ -27,6 +27,11 @@ public:
 	virtual ~LearningKernel();
 
 	/**
+	 * Returns true if the underlying classifier is trained, false otherwise.
+	 */
+	bool isTrained() { return m_pTrees && m_pTrees->isTrained(); }
+
+	/**
 	 * Trains the learning model with the given training set.
 	 * @param trainingSet - A matrix of training samples.
 	 * @param layout - The layout of the matrix.  Must be either ROW_SAMPLE or COL_SAMPLE.
