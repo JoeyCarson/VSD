@@ -69,16 +69,22 @@ cv::Mat ViolenceModel::trueResults(VideoSetTarget target, bool positive)
 		// Evaluate the examples against the trained model.
 		learningKernel.predict(*exampleStore, predictedClasses);
 
-		cv::Mat classStoreCopy(*classStore);
-		cv::Mat predictedClassesCopy(predictedClasses);
+		if ( classStore->size() == predictedClasses.size() ) {
 
-		if ( !positive )
-		{
-			cv::bitwise_not(*classStore, classStoreCopy);
-			cv::bitwise_not(predictedClasses, predictedClassesCopy);
+			cv::Mat classStoreCopy = classStore->clone();
+			cv::Mat predictedClassesCopy = predictedClasses.clone();
+
+			if ( !positive )
+			{
+				//std::cout << "classStoreCopy : " << classStoreCopy << "\n";
+				cv::bitwise_xor(classStoreCopy, cv::Scalar(1), classStoreCopy);
+				//std::cout << "classStoreCopy NOT : " << classStoreCopy << "\n";
+				cv::bitwise_xor(predictedClasses, cv::Scalar(1), predictedClassesCopy);
+			}
+
+			predictedClassesCopy.convertTo(predictedClassesCopy, CV_32S);
+			cv::bitwise_and(classStoreCopy, predictedClassesCopy, ANDResult);
 		}
-
-		cv::bitwise_and(classStoreCopy, predictedClassesCopy, ANDResult);
 	}
 
 	return ANDResult;
@@ -94,6 +100,9 @@ double ViolenceModel::computeError(VideoSetTarget target)
 	learningKernel.predict(*exampleStore, predictedClasses);
 
 	//std::cout << "learning kernel class predictions: \n" << predictedClasses << "\n";
+	//uint totalTP = cv::sum(trueResults(target, true))[0];
+	//uint totalTN = cv::sum(trueResults(target, false))[0];
+	//std::cout << "totalTP: " << totalTP << " totalTN: " << totalTN << " sum: " << (totalTP + totalTN) << "\n";
 
 	cv::Scalar mean;
 	if ( classStore->size() == predictedClasses.size() ) {
@@ -328,7 +337,13 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 
 void ViolenceModel::train()
 {
-	learningKernel.train(trainingExampleStore, cv::ml::ROW_SAMPLE, trainingClassStore);
+	cv::Mat *trainEx, *trainCl;
+	resolveDataStructures(ViolenceModel::TRAINING, &trainEx, &trainCl, NULL);
+	if ( trainEx && trainCl ) {
+		learningKernel.train(*trainEx, cv::ml::ROW_SAMPLE, *trainCl);
+	} else {
+		std::cout << "train -> data structures could not be resolved " << "\n";
+	}
 }
 
 void ViolenceModel::predict(boost::filesystem::path filePath, float timeInterval)
