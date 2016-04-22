@@ -20,13 +20,13 @@ LearningKernel::LearningKernel(std::string modelPath)
 
 void LearningKernel::initRandomTrees()
 {
-	m_pTrees->setMaxDepth(250);
+	std::cout << "init random trees\n";
+	m_pTrees->setMaxDepth(10);
 	m_pTrees->setMinSampleCount(5);
 
-	cv::TermCriteria criteria(cv::TermCriteria::EPS, 500, 0.001);
+	cv::TermCriteria criteria(cv::TermCriteria::COUNT, 50, 0);
 	m_pTrees->setTermCriteria(criteria);
 	m_pTrees->setCalculateVarImportance(false);
-	m_pTrees->setRegressionAccuracy(0);
 
 	// This is a binary classifier (max of 2 classes).
 	m_pTrees->setMaxCategories(2);
@@ -62,7 +62,9 @@ float LearningKernel::predict( cv::InputArray samples, cv::OutputArray response 
 void LearningKernel::persist()
 {
 	if ( m_pTrees && !m_pTrees->empty() && m_pTrees->isTrained() ) {
-			m_pTrees->save(statModelPath);
+
+		std::cout << "persisting trained model\n";
+		m_pTrees->save(statModelPath);
 	}
 }
 

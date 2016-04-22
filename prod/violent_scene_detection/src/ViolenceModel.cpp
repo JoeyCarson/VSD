@@ -8,7 +8,7 @@
 #include <cassert>
 #include <iostream>
 #include <unistd.h>
-#include <ejdb/ejdb.h>
+#include <sys/time.h>
 
 #include "ImageBlob.h"
 #include "ViolenceModel.h"
@@ -100,9 +100,9 @@ double ViolenceModel::computeError(VideoSetTarget target)
 	learningKernel.predict(*exampleStore, predictedClasses);
 
 	//std::cout << "learning kernel class predictions: \n" << predictedClasses << "\n";
-	//uint totalTP = cv::sum(trueResults(target, true))[0];
-	//uint totalTN = cv::sum(trueResults(target, false))[0];
-	//std::cout << "totalTP: " << totalTP << " totalTN: " << totalTN << " sum: " << (totalTP + totalTN) << "\n";
+	uint totalTP = cv::sum(trueResults(target, true))[0];
+	uint totalTN = cv::sum(trueResults(target, false))[0];
+	std::cout << "totalTP: " << totalTP << " totalTN: " << totalTN << " sum: " << (totalTP + totalTN) << "\n";
 
 	cv::Scalar mean;
 	if ( classStore->size() == predictedClasses.size() ) {
@@ -200,7 +200,7 @@ void ViolenceModel::index(VideoSetTarget target, std::string resourcePath, bool 
 
 		// Create a VideoCapture instance bound to the path.
 		cv::VideoCapture capture(resourcePath);
-		std::vector<cv::Mat> trainingSample = extractFeatures(capture, resourcePath);
+		std::vector<cv::Mat> trainingSample = extractFeatures(capture, resourcePath, 50);
 		addSample(target, path, trainingSample, isViolent);
 
 	} else {
@@ -246,6 +246,9 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 	bool capCurrSuccess = false;
 
 	// TODO: Should we need to try to open the capture if it's not?
+
+	timeval begin, end;
+	gettimeofday(&begin, NULL);
 
 	// Load the prev frame with the first frame and current with the second
 	// so that we can simply loop and compute.
@@ -332,6 +335,11 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 
 	// Build a single training sample for each algorithm.
 	std::vector<cv::Mat> trainingSample = buildSample(blobs);
+
+	gettimeofday(&end, NULL);
+	std::cout << "extractFeatures takes: " << (end.tv_sec)  - begin.tv_sec << " s\n";
+
+
 	return trainingSample;
 }
 
