@@ -28,6 +28,19 @@ public:
 	static cv::Mat scaleImageIntoRect(const cv::Mat img, cv::Size size);
 
 	static void printContour(std::vector<cv::Point> c, std::string name = "");
+
+	// Returns randomly shuffled copies of the given examples and classes of a dataset, such that their indices are shuffled equally.
+	// Credit to: http://stackoverflow.com/questions/17348854/random-order-shuffle-cvmat-in-opencv
+	static void shuffleDataset(const cv::Mat &examplesIn, const cv::Mat &classesIn, cv::Mat* shuffledExamplesOut, cv::Mat *shuffledClassesOut );
+
+	/**
+	 * Returns a binary matrix representing whether or not the example at each index was predicted correctly..
+	 * @param positive - Whether to detect true positives or true negatives.
+	 * @param predictions - Predictions made against a trained ML model.
+	 * @param groundTruth - Ground truth of what the predictions should evaluate to.
+	 */
+	static cv::Mat trueResults(bool positive, const cv::Mat &predictions, const cv::Mat &groundTruth);
+
 	//ImageUtil();
 	//virtual ~ImageUtil();
 

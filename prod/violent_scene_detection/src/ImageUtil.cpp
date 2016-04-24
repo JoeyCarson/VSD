@@ -15,6 +15,57 @@
 
 #define DEBUG_OUTPUT_DIR "./debug"
 
+void ImageUtil::shuffleDataset(const cv::Mat &examplesIn, const cv::Mat &classesIn, cv::Mat* shuffledExamplesOut, cv::Mat *shuffledClassesOut )
+{
+	// Ensure that the given examples and classes are equal in size.  Only do work if we're given output pointers.
+	if ( examplesIn.size().height == classesIn.size().height && shuffledExamplesOut && shuffledClassesOut ) {
+
+		std::vector <int> seeds;
+
+		// Make the output objects empty yet able to fit the width of the input objects.
+		shuffledExamplesOut->create(examplesIn.size().width, 0, examplesIn.type());
+		shuffledClassesOut->create(classesIn.size().width, 0, classesIn.type());
+
+		// Build a list of indices.
+		for (int cont = 0; cont < examplesIn.rows; cont++) {
+			seeds.push_back(cont);
+		}
+
+		// Randomly shuffle those indices.
+		cv::randShuffle(seeds);
+
+		// Copy the values at the random indices to the output pointers.
+		for (int cont = 0; cont < examplesIn.rows; cont++) {
+			shuffledExamplesOut->push_back(examplesIn.row(seeds[cont]));
+			shuffledClassesOut->push_back(classesIn.row(seeds[cont]));
+		}
+	}
+}
+
+cv::Mat ImageUtil::trueResults(bool positive, const cv::Mat &predictions, const cv::Mat &groundTruth)
+{
+	cv::Mat ANDResult;
+
+	if ( predictions.size() == groundTruth.size() ) {
+
+		cv::Mat classStoreCopy = groundTruth.clone();
+		cv::Mat predictedClassesCopy = predictions.clone();
+
+		if ( !positive )
+		{
+			//std::cout << "classStoreCopy : " << classStoreCopy << "\n";
+			cv::bitwise_xor(classStoreCopy, cv::Scalar(1), classStoreCopy);
+			//std::cout << "classStoreCopy NOT : " << classStoreCopy << "\n";
+			cv::bitwise_xor(predictions, cv::Scalar(1), predictedClassesCopy);
+		}
+
+		predictedClassesCopy.convertTo(predictedClassesCopy, CV_32S);
+		cv::bitwise_and(classStoreCopy, predictedClassesCopy, ANDResult);
+	}
+
+	return ANDResult;
+}
+
 void ImageUtil::dumpDebugImage(cv::Mat image, std::string outputFileName)
 {
 	static bool firstCall = true;

@@ -9,6 +9,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <sys/time.h>
+#include <stdlib.h>
 
 #include "ImageBlob.h"
 #include "ViolenceModel.h"
@@ -26,16 +27,6 @@
 #define VIOLENCE_MODEL_TRAINING_SET_CLASSES "violence_model_train_classes"
 #define VIOLENCE_MODEL_TRAINING_FILE_PATHS "violence_model_training_file_paths"
 
-// Names for accessing cross validation set.
-#define VIOLENCE_MODEL_XVAL_SET "violence_model_xval"
-#define VIOLENCE_MODEL_XVAL_SET_CLASSES "violence_model_xval_classes"
-#define VIOLENCE_MODEL_XVAL_FILE_PATHS "violence_model_xval_file_paths"
-
-// Names for accessing test set.
-#define VIOLENCE_MODEL_TEST_SET "violence_model_test"
-#define VIOLENCE_MODEL_TEST_SET_CLASSES "violence_model_test_classes"
-#define VIOLENCE_MODEL_TEST_FILE_PATHS "violence_model_test_file_paths"
-
 
 #define VIOLENCE_MODEL_TRAINING_EXAMPLE_MOD_DATE "last_modified"
 #define VIOLENCE_MODEL_TRAINING_EXAMPLE_PATH "path"
@@ -48,91 +39,123 @@ const uint TARGET_COMMON_WIDTH = 320;
 const uint TARGET_COMMON_HEIGHT = 240;
 
 ViolenceModel::ViolenceModel(std::string trainingStorePath)
-: trainingStorePath(trainingStorePath)
+: trainingStorePath(trainingStorePath),
+  trainingExampleStore(NULL),
+  trainingClassStore(NULL),
+  trainingIndexCache(NULL)
 {
-	//storeInit();
+
 }
 
-uint ViolenceModel::size(VideoSetTarget target)
+uint ViolenceModel::size()
 {
 	std::map<std::string, time_t> *targetIndex;
-	resolveDataStructures(target, NULL, NULL, &targetIndex);
+	resolveDataStructures(NULL, NULL, &targetIndex);
 	return targetIndex ? targetIndex->size() : 0;
 }
 
-cv::Mat ViolenceModel::trueResults(VideoSetTarget target, bool positive)
+//double ViolenceModel::computeError(/*VideoSetTarget target*/)
+//{
+//	// Compute the MSE for the target dataset when applying it to the trained model.
+//	cv::Mat *exampleStore, *classStore, predictedClasses, diff;
+//	resolveDataStructures(/*target,*/ &exampleStore, &classStore, NULL);
+//
+//	// Evaluate the examples against the trained model.
+//	learningKernel.predict(*exampleStore, predictedClasses);
+//
+//	//std::cout << "learning kernel class predictions: \n" << predictedClasses << "\n";
+//	uint totalTP = cv::sum(trueResults(/*target,*/ true))[0];
+//	uint totalTN = cv::sum(trueResults(/*target,*/ false))[0];
+//	std::cout << "totalTP: " << totalTP << " totalTN: " << totalTN << " sum: " << (totalTP + totalTN) << "\n";
+//
+//	cv::Scalar mean;
+//	if ( classStore->size() == predictedClasses.size() ) {
+//		// Ensure that the matrices have compatible types.
+//		predictedClasses.convertTo(predictedClasses, CV_32S);
+//		//std::cout << "classStore type: " << classStore->type() << " predictedClasses type: " << predictedClasses.type() <<"\n";
+//
+//		// Compute the absolute difference between the stored classes (ground truth) and the predicted classes.
+//		cv::absdiff(*classStore, predictedClasses, diff);
+//		diff.mul(diff);
+//		mean = cv::mean(diff);
+//	} else std::cout << "computeError -> class vectors are not compatible " << "predictedClasses: " << predictedClasses.size() << " classStore: " << classStore->size() << ".\n";
+//
+//	std::cout << "computeError: " << targetToString(target) << ": " << mean << "\n";
+//	return mean[0];
+//}
+//
+
+
+void ViolenceModel::crossValidate(uint k)
 {
-	cv::Mat *exampleStore, *classStore, predictedClasses, ANDResult;
+	cv::Mat *examples, *classes;
+	if ( resolveDataStructures(&examples, &classes, NULL) ) {
 
-	if ( learningKernel.isTrained() && resolveDataStructures(target, &exampleStore, &classStore, NULL) )
-	{
-		// Evaluate the examples against the trained model.
-		learningKernel.predict(*exampleStore, predictedClasses);
+		std::cout << "cross validate -> k:" << k << "\n";
 
-		if ( classStore->size() == predictedClasses.size() ) {
+		// First get a randomly ordered copy of the training set.
+		// Classes and examples are randomized on the same indices, meaning that they're still aligned example to class correctly.
+		cv::Mat randomExamples, randomClasses;
+		ImageUtil::shuffleDataset(*examples, *classes, &randomExamples, &randomClasses);
+		//std::cout << "randomExamples: " << randomExamples << " randomClasses: " << randomClasses << "\n";
 
-			cv::Mat classStoreCopy = classStore->clone();
-			cv::Mat predictedClassesCopy = predictedClasses.clone();
+		uint ki_size = examples->size().height / k;
+		std::cout << "cross validate ki_size: " << ki_size << "\n";
+		cv::Mat randomSubExamples;//(examples->size().width, ki_size, examples->type());
+		cv::Mat randomSubClasses;//(classes->size().width, ki_size, classes->type());
 
-			if ( !positive )
-			{
-				//std::cout << "classStoreCopy : " << classStoreCopy << "\n";
-				cv::bitwise_xor(classStoreCopy, cv::Scalar(1), classStoreCopy);
-				//std::cout << "classStoreCopy NOT : " << classStoreCopy << "\n";
-				cv::bitwise_xor(predictedClasses, cv::Scalar(1), predictedClassesCopy);
+		// The previously used examples and classes.  This allows us to step through the randomized samples efficiently,
+		// while remembering the ones we used in the past.
+		std::vector<cv::Mat> prevSubExamples, prevSubClasses;
+		uint runningTP = 0, runningTN = 0;
+
+		for ( uint ki = 0; ki < k; ki++ )
+		{
+			// The offset into the training data that represents the beginning of region ki.
+			uint k_offset_begin = ki * ki_size;
+			uint k_offset_end   = k_offset_begin + ki_size - 1;//( ( ki + 1 ) * k ) - 1;
+			std::cout << "k_offset_begin: " << k_offset_begin << " k_offset_end: " << k_offset_end << "\n";
+
+			// The range of this sub region in the data.
+			cv::Range k_range(k_offset_begin, k_offset_end);
+			//std::cout << "k_range: " << k_range << "\n";
+			randomSubExamples = randomExamples.rowRange(k_range).clone();
+			randomSubClasses = randomClasses.rowRange(k_range).clone();
+
+			// The range from the first element after
+			cv::Range kplus1_to_end(k_offset_end + 1, examples->size().height - 1);
+
+			cv::Mat currentTrainingExamples = randomExamples.rowRange(kplus1_to_end);
+			cv::Mat currentTrainingClasses = randomClasses.rowRange(kplus1_to_end);
+
+			// Add any previous sub regions that we used as validation example/class data.
+			for ( uint i = 0; i < prevSubExamples.size(); i++ ) {
+				currentTrainingExamples.push_back( prevSubExamples[i] );
+				currentTrainingClasses.push_back( prevSubClasses[i] );
 			}
 
-			predictedClassesCopy.convertTo(predictedClassesCopy, CV_32S);
-			cv::bitwise_and(classStoreCopy, predictedClassesCopy, ANDResult);
+			// Add the currently used sub regions so that the can be added to the training set on the next iteration.
+			prevSubExamples.push_back( randomSubExamples.clone() );
+			prevSubClasses.push_back( randomSubClasses.clone() );
+
+			cv::Mat predictions; // Train this bitch and predict.
+			learningKernel.train(currentTrainingExamples, cv::ml::ROW_SAMPLE, currentTrainingClasses);
+			learningKernel.predict(randomSubExamples, predictions);
+
+			int TP = cv::sum(ImageUtil::trueResults(true, predictions, randomSubClasses))[0];
+			int TN = cv::sum(ImageUtil::trueResults(false, predictions, randomSubClasses))[0];
+
+			std::cout << "true positives: " << TP << " true negatives: " << TN << "\n";
+			runningTP += TP; runningTN += TN;
 		}
+
+		uint totalAccurate = runningTP + runningTN;
+		std::cout << "totalTP: " << runningTP << " totalTN: " << runningTN << " totalAccurate: " << totalAccurate << " mean accurate: " << float(totalAccurate) / (k * ki_size) << "\n";
+
+	} else {
+		std::cout << "cross validation failed: couldn't resolve data structures.\n";
 	}
 
-	return ANDResult;
-}
-
-double ViolenceModel::computeError(VideoSetTarget target)
-{
-	// Compute the MSE for the target dataset when applying it to the trained model.
-	cv::Mat *exampleStore, *classStore, predictedClasses, diff;
-	resolveDataStructures(target, &exampleStore, &classStore, NULL);
-
-	// Evaluate the examples against the trained model.
-	learningKernel.predict(*exampleStore, predictedClasses);
-
-	//std::cout << "learning kernel class predictions: \n" << predictedClasses << "\n";
-	uint totalTP = cv::sum(trueResults(target, true))[0];
-	uint totalTN = cv::sum(trueResults(target, false))[0];
-	std::cout << "totalTP: " << totalTP << " totalTN: " << totalTN << " sum: " << (totalTP + totalTN) << "\n";
-
-	cv::Scalar mean;
-	if ( classStore->size() == predictedClasses.size() ) {
-		// Ensure that the matrices have compatible types.
-		predictedClasses.convertTo(predictedClasses, CV_32S);
-		//std::cout << "classStore type: " << classStore->type() << " predictedClasses type: " << predictedClasses.type() <<"\n";
-
-		// Compute the absolute difference between the stored classes (ground truth) and the predicted classes.
-		cv::absdiff(*classStore, predictedClasses, diff);
-		diff.mul(diff);
-		mean = cv::mean(diff);
-	} else std::cout << "computeError -> class vectors are not compatible " << "predictedClasses: " << predictedClasses.size() << " classStore: " << classStore->size() << ".\n";
-
-	std::cout << "computeError: " << targetToString(target) << ": " << mean << "\n";
-	return mean[0];
-}
-
-std::string ViolenceModel::targetToString(VideoSetTarget target)
-{
-	std::string targetStr;
-
-	switch (target)
-	{
-		case ViolenceModel::TRAINING: targetStr = "Training"; break;
-		case ViolenceModel::X_VALIDATION: targetStr = "Cross Validation"; break;
-		case ViolenceModel::TESTING: targetStr = "Testing"; break;
-		default: targetStr = "Unknown";
-	}
-
-	return targetStr;
 }
 
 void ViolenceModel::clear()
@@ -141,22 +164,7 @@ void ViolenceModel::clear()
 	cv::Mat *exampleStore, *classStore;
 	std::map<std::string, time_t> *indexCache;
 
-	// TODO: Can't we do this in a loop?
-	resolveDataStructures(ViolenceModel::TRAINING, &exampleStore, &classStore, &indexCache);
-	if ( exampleStore && classStore && indexCache) {
-		exampleStore->create(0, 0, CV_32F);
-		classStore->create(0, 0, CV_32S);
-		indexCache->clear();
-	}
-
-	resolveDataStructures(ViolenceModel::X_VALIDATION, &exampleStore, &classStore, &indexCache);
-	if ( exampleStore && classStore && indexCache) {
-		exampleStore->create(0, 0, CV_32F);
-		classStore->create(0, 0, CV_32S);
-		indexCache->clear();
-	}
-
-	resolveDataStructures(ViolenceModel::TESTING, &exampleStore, &classStore, &indexCache);
+	resolveDataStructures(/*ViolenceModel::TRAINING,*/ &exampleStore, &classStore, &indexCache);
 	if ( exampleStore && classStore && indexCache) {
 		exampleStore->create(0, 0, CV_32F);
 		classStore->create(0, 0, CV_32S);
@@ -193,25 +201,25 @@ void ViolenceModel::storeInit(cv::FileStorage &file, std::string exampleStoreNam
 	assert(classStore.size().height == exampleStore.size().height && classStore.size().height == indexCache.size());
 }
 
-void ViolenceModel::index(VideoSetTarget target, std::string resourcePath, bool isViolent)
+void ViolenceModel::index(std::string resourcePath, bool isViolent)
 {
 	boost::filesystem::path path(resourcePath);
-	if ( !isIndexed(target, path) ) {
+	if ( !isIndexed( path ) ) {
 
 		// Create a VideoCapture instance bound to the path.
 		cv::VideoCapture capture(resourcePath);
 		std::vector<cv::Mat> trainingSample = extractFeatures(capture, resourcePath, 50);
-		addSample(target, path, trainingSample, isViolent);
+		addSample( path, trainingSample, isViolent);
 
 	} else {
 		std::cout << "index -> skipping indexed path: " << resourcePath << "\n";
 	}
 }
 
-bool ViolenceModel::isIndexed(VideoSetTarget target, boost::filesystem::path resourcePath)
+bool ViolenceModel::isIndexed(boost::filesystem::path resourcePath)
 {
 	std::map<std::string, time_t> *index = NULL;
-	resolveDataStructures(target, NULL, NULL, &index);
+	resolveDataStructures(NULL, NULL, &index);
 
 	boost::filesystem::path absolutePath = boost::filesystem::absolute(resourcePath);
 	std::string indexKey = createIndexKey(absolutePath);
@@ -299,10 +307,6 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		std::vector<cv::Vec4i> hierarchy;
 		cv::findContours(binAbsDiff, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
 
-		// TODO: At the moment we're just reading these values into local variables.  The intention is to store them
-		// in a class member that can store it in a format that is both efficient for learning model computation and
-		// persistent store in the file system (so that the arduous process of extracting the features isn't necessary
-		// every single time.
 		// See http://www.boost.org/doc/libs/1_39_0/libs/bimap/doc/html/boost_bimap/one_minute_tutorial.html
 		BOOST_FOREACH(std::vector<cv::Point> cont, contours)
 		{
@@ -339,14 +343,14 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 	gettimeofday(&end, NULL);
 	std::cout << "extractFeatures takes: " << (end.tv_sec)  - begin.tv_sec << " s\n";
 
-
 	return trainingSample;
 }
 
 void ViolenceModel::train()
 {
+	// TODO: Pull an equal number of positive and negative examples.  Build a training data matrix on these.
 	cv::Mat *trainEx, *trainCl;
-	resolveDataStructures(ViolenceModel::TRAINING, &trainEx, &trainCl, NULL);
+	resolveDataStructures(&trainEx, &trainCl, NULL);
 	if ( trainEx && trainCl ) {
 		learningKernel.train(*trainEx, cv::ml::ROW_SAMPLE, *trainCl);
 	} else {
@@ -417,90 +421,57 @@ std::vector<cv::Mat> ViolenceModel::buildSample(std::vector<ImageBlob> blobs)
 	return retVect;
 }
 
-bool ViolenceModel::resolveDataStructures(VideoSetTarget target, cv::Mat **exampleStore, cv::Mat **classStore , std::map<std::string, time_t> **indexCache, bool readFileIfEmpty)
+bool ViolenceModel::resolveDataStructures( cv::Mat **exampleStore, cv::Mat **classStore , std::map<std::string, time_t> **indexCache, bool readFileIfEmpty)
 {
-	bool successfullyResolved = true;
-	// Training Set Data Structures.
-	cv::Mat *examples = NULL;
-	cv::Mat *classes = NULL;
-	std::map<std::string, time_t> *index = NULL;
-	std::string exampleStoreName, classStoreName, indexStoreName;
-
-	switch ( target )
-	{
-		case ViolenceModel::TRAINING:
-			examples = &trainingExampleStore;
-			classes = &trainingClassStore;
-			index = &trainingIndexCache;
-			exampleStoreName = VIOLENCE_MODEL_TRAINING_SET;
-			classStoreName = VIOLENCE_MODEL_TRAINING_SET_CLASSES;
-			indexStoreName = VIOLENCE_MODEL_TRAINING_FILE_PATHS;
-
-			break;
-
-		case ViolenceModel::TESTING:
-			examples = &testExampleStore;
-			classes = &testClassStore;
-			index = &testIndexCache;
-			exampleStoreName = VIOLENCE_MODEL_TEST_SET;
-			classStoreName = VIOLENCE_MODEL_TEST_SET_CLASSES;
-			indexStoreName = VIOLENCE_MODEL_TEST_FILE_PATHS;
-
-			break;
-
-		case ViolenceModel::X_VALIDATION:
-			examples = &xvalExampleStore;
-			classes = &xvalClassStore;
-			index = &xvalIndexCache;
-			exampleStoreName = VIOLENCE_MODEL_XVAL_SET;
-			classStoreName = VIOLENCE_MODEL_XVAL_SET_CLASSES;
-			indexStoreName = VIOLENCE_MODEL_XVAL_FILE_PATHS;
-			break;
-
-		default: {
-			std::cout << "VideoSetTarget " << target << " is invalid.";
-			assert(false);
-			successfullyResolved = false;
-		}
-	}
-
 	// If any of the structures are empty, initialize them.  Note that we will initialize all structures as they should always
 	// be in sync with one another.
 	// TODO: It would be great to hide all of this functionality in a base class so there is no temptation to grab a hold
 	// 		 of any structures without properly pulling from this method.
-	if ( successfullyResolved && readFileIfEmpty && (examples->empty() || classes->empty() || index->empty()) ) {
+
+	if ( readFileIfEmpty && (!trainingExampleStore || !trainingClassStore || !trainingIndexCache) ) {
+
+		trainingExampleStore = new cv::Mat();
+		trainingClassStore = new cv::Mat();
+		trainingIndexCache = new std::map<std::string, time_t>();
 
 		cv::FileStorage file;
-		std::cout << "initializing data structures for target: " << ViolenceModel::targetToString(target) << "\n";
+		std::cout << "initializing data structures for target: " << "\n";
 
 		bool trainingStoreOpenSuccess = file.open(trainingStorePath, cv::FileStorage::READ);
+
+		std::string exampleStoreName, classStoreName, indexStoreName;
+		exampleStoreName = VIOLENCE_MODEL_TRAINING_SET;
+		classStoreName   = VIOLENCE_MODEL_TRAINING_SET_CLASSES;
+		indexStoreName   = VIOLENCE_MODEL_TRAINING_FILE_PATHS;
+
 		if (trainingStoreOpenSuccess) {
-			storeInit(file, exampleStoreName, *examples,
-							classStoreName, *classes,
-							indexStoreName, *index);
+			storeInit(file, exampleStoreName, *trainingExampleStore,
+							classStoreName, *trainingClassStore,
+							indexStoreName, *trainingIndexCache);
 		} else {
 			std::cout << "Failed opening training store at " << trainingStorePath << "\n";
 		}
 	}
 
 	// Write the addresses if output pointers are given.
-	if ( exampleStore ) *exampleStore = examples;
-	if ( classStore   ) *classStore   = classes;
-	if ( indexCache   ) *indexCache   = index;
+	if ( exampleStore ) *exampleStore = trainingExampleStore;
+	if ( classStore   ) *classStore   = trainingClassStore;
+	if ( indexCache   ) *indexCache   = trainingIndexCache;
 
-	return successfullyResolved;
+	// Consider the function successful if all 3 objects are instantiated.
+	return trainingExampleStore && trainingClassStore && trainingIndexCache;
 }
 
-void ViolenceModel::addSample(VideoSetTarget target, boost::filesystem::path path, std::vector<cv::Mat> sample, bool isViolent)
+void ViolenceModel::addSample( boost::filesystem::path path, std::vector<cv::Mat> sample, bool isViolent)
 {
 	boost::filesystem::path absolutePath = boost::filesystem::absolute(path);
 
-	if ( !isIndexed( target, absolutePath ) )
+	if ( !isIndexed( absolutePath ) )
 	{
 
 		cv::Mat *exampleStore, *classStore;
 		std::map<std::string, time_t> *indexCache;
-		resolveDataStructures(target, &exampleStore, &classStore, &indexCache);
+		resolveDataStructures(&exampleStore, &classStore, &indexCache);
 
 		if ( exampleStore && classStore && indexCache ) {
 
@@ -543,45 +514,24 @@ void ViolenceModel::persistStore()
 {
 	cv::Mat *trEx, *trCl;
 	std::map<std::string, time_t> *trInd;
-	resolveDataStructures(ViolenceModel::TRAINING, &trEx, &trCl, &trInd, false);
-
-	cv::Mat *xvEx, *xvCl;
-	std::map<std::string, time_t> *xvInd;
-	resolveDataStructures(ViolenceModel::X_VALIDATION, &xvEx, &xvCl, &xvInd, false);
-
-	cv::Mat *tstEx, *tstCl;
-	std::map<std::string, time_t> *tstInd;
-	resolveDataStructures(ViolenceModel::TESTING, &tstEx, &tstCl, &tstInd, false);
-
-	cv::FileStorage file;
-	// Open the training store file for write and write it.
-	bool trainingStoreOpenSuccess = file.open(trainingStorePath, cv::FileStorage::WRITE);
-	if (!trainingStoreOpenSuccess) {
-		std::cout << "Failed opening training store at " << trainingStorePath << "\n";
-		return;
-	}
+	resolveDataStructures(&trEx, &trCl, &trInd, false);
 
 	// Persist the training set.
 	if ( trEx && trCl && trInd ) {
+
+		cv::FileStorage file;
+		// Open the training store file for write and write it.
+		bool trainingStoreOpenSuccess = file.open(trainingStorePath, cv::FileStorage::WRITE);
+		if (!trainingStoreOpenSuccess) {
+			std::cout << "Failed opening training store at " << trainingStorePath << "\n";
+			return;
+		}
+
 		persistStore(file, VIOLENCE_MODEL_TRAINING_SET,*trEx,
 						   VIOLENCE_MODEL_TRAINING_SET_CLASSES, *trCl,
 						   VIOLENCE_MODEL_TRAINING_FILE_PATHS, *trInd);
 	}
 
-	// Persist the cross-validation set.
-	if ( xvEx && xvCl && xvInd ) {
-		persistStore(file, VIOLENCE_MODEL_XVAL_SET, *xvEx,
-						   VIOLENCE_MODEL_XVAL_SET_CLASSES, *xvCl,
-						   VIOLENCE_MODEL_XVAL_FILE_PATHS, *xvInd);
-	}
-
-
-	// Persist the test set.
-	if ( tstEx && tstCl && tstInd ) {
-		persistStore(file, VIOLENCE_MODEL_TEST_SET, *tstEx,
-						   VIOLENCE_MODEL_TEST_SET_CLASSES, *tstCl,
-						   VIOLENCE_MODEL_TEST_FILE_PATHS, *tstInd);
-	}
 }
 
 void ViolenceModel::persistStore(cv::FileStorage file, std::string exampleStoreName, const cv::Mat &exampleStore,

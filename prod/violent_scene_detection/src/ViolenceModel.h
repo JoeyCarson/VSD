@@ -25,11 +25,6 @@ class ViolenceModel {
 
 public:
 
-	enum VideoSetTarget { TRAINING = 0,
-					      X_VALIDATION,
-					      TESTING,
-						  SAMPLE_TYPE_COUNT };
-
 	/**
 	 * Constructor.
 	 * @param trainingStorePath - Path to where the training database file is stored.
@@ -55,19 +50,12 @@ public:
 	 * @param resourcePath - The path to the input file to index as a training sample.
 	 * @param isViolent - true (default) if the given is a positive example of violence, false otherwise.
 	 */
-	void index(VideoSetTarget target, std::string resourcePath, bool isViolent = true);
+	void index(std::string resourcePath, bool isViolent = true);
 
 	/**
-	 * Returns the number of indexed samples for the given target type.
+	 * Returns the number of indexed samples.
 	 */
-	uint size(VideoSetTarget target);
-
-	/**
-	 * Returns a binary matrix representing whether or not the example at index was predicted correctly.
-	 * @param target - The dataset to evaluate the results of.
-	 * @param positive - Whether to detect true positives or true negatives.
-	 */
-	cv::Mat trueResults(VideoSetTarget target, bool positive);
+	uint size();
 
 	/**
 	 * Create a path suitable for using as the index key.
@@ -77,7 +65,7 @@ public:
 	/**
 	 * Returns true if the file at the given path is indexed, false otherwise.
 	 */
-	bool isIndexed(VideoSetTarget target, boost::filesystem::path resourcePath);
+	bool isIndexed(boost::filesystem::path resourcePath);
 
 	/**
 	 * Trains the learning model using the existing indexed training set.
@@ -104,14 +92,11 @@ public:
 	void persistStore();
 
 	/**
-	 * Compute the error for the associated target.
+	 * Compute the error.
 	 */
-	double computeError(VideoSetTarget target);
+	double computeError();
 
-	/**
-	 *
-	 */
-	static std::string targetToString(VideoSetTarget target);
+	void crossValidate(uint k = 10);
 
 private:
 
@@ -119,19 +104,10 @@ private:
 	std::string trainingStorePath;
 
 	// Training Set Data Structures.
-	cv::Mat trainingExampleStore;
-	cv::Mat trainingClassStore;
-	std::map<std::string, time_t> trainingIndexCache;
+	cv::Mat *trainingExampleStore;
+	cv::Mat *trainingClassStore;
+	std::map<std::string, time_t> *trainingIndexCache;
 
-	// Cross Validation Set Data Structures.
-	cv::Mat xvalExampleStore;
-	cv::Mat xvalClassStore;
-	std::map<std::string, time_t> xvalIndexCache;
-
-	// Test Set Data Structures.
-	cv::Mat testExampleStore;
-	cv::Mat testClassStore;
-	std::map<std::string, time_t> testIndexCache;
 
 	// ML Kernel.
 	LearningKernel learningKernel;
@@ -139,7 +115,7 @@ private:
 	/**
 	 * Resolve the data structures that are associated with the given target.
 	 */
-	bool resolveDataStructures(VideoSetTarget target, cv::Mat **exampleStore = NULL, cv::Mat **classStore = NULL, std::map<std::string, time_t> **indexCache = NULL, bool readFileIfEmpty = true);
+	bool resolveDataStructures(cv::Mat **exampleStore = NULL, cv::Mat **classStore = NULL, std::map<std::string, time_t> **indexCache = NULL, bool readFileIfEmpty = true);
 
 
 	/**
@@ -160,7 +136,7 @@ private:
 	 * Add the training samples for their respective algorithms to their respective
 	 * training store.
 	 */
-	void addSample(VideoSetTarget target, boost::filesystem::path p, std::vector<cv::Mat> trainingSample, bool isViolent);
+	void addSample(boost::filesystem::path p, std::vector<cv::Mat> trainingSample, bool isViolent);
 
 	/**
 	 * Store the examples, classes, and indexes in the given file.
