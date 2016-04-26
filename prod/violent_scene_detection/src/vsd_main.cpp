@@ -15,7 +15,7 @@
  // Path to index file.
 static boost::filesystem::path indexFilePath;
 static boost::filesystem::path predictionFilePath;
-static unsigned long xval_k = 10;
+static long xval_k = 10;
 
 // Parses the input file and indexes the paths if they're valid.
 bool process_index_file(boost::filesystem::path path, ViolenceModel &model);
@@ -50,18 +50,18 @@ void terminated(int signum)
 int main(int argc, char* argv[]) {
 
 	// the old random dance.
-	srand( time(NULL) );
+	std::srand( std::time(NULL) );
 
-	struct sigaction action = {0};
-	action.sa_handler = terminated;
-	sigaction(SIGTERM, &action, NULL);
+	//	struct sigaction action = {0};
+	//	action.sa_handler = terminated;
+	//	sigaction(SIGTERM, &action, NULL);
 
 	// Set up command line arg parser.
 	option::Stats  stats(usage, argc, argv);
 
 	// The sizes are just suitable maximums.
 	// Trying to declare them on the heap using the sizes from the example crashes.
-	// The example code tries to use the options_max and buffer_max values to initalize
+	// The example code tries to use the options_max and buffer_max values to initialize
 	// stack arrays.  This is illegal as the size isn't known at compile time.  Not sure
 	// why it would be included as a sample as it clearly doesn't build.
 	option::Option options[256];
@@ -83,6 +83,7 @@ int main(int argc, char* argv[]) {
 
 	if ( options[XVAL] ) {
 		vm.crossValidate(xval_k);
+		vm.graciaCrossValidate(xval_k);
 	}
 
 	if (  options[TRAIN] ) {
@@ -229,9 +230,10 @@ option::ArgStatus checkXValArg(const option::Option& option, bool msg)
 
 		xval_k = strtol(option.arg, NULL, 0);
 
-		if ( xval_k == 0 ) {
+		if ( xval_k <= 0 ) {
 			if ( msg ) {
-				std::cout << "cross validation K must be a non-zero positive integer.\n";
+				std::cout << "cross validation K must be a non-zero positive integer or empty to assume default. " << option.arg << " given.\n";
+				option::printUsage(std::cout, usage);
 			}
 
 			return option::ARG_ILLEGAL;

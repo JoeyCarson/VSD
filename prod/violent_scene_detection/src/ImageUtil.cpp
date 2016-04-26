@@ -15,12 +15,21 @@
 
 #define DEBUG_OUTPUT_DIR "./debug"
 
+
+struct RNG {
+    int operator() (int n) {
+        return std::rand() / (1.0 + RAND_MAX) * n;
+    }
+};
+
+static cv::RNG sRNG(time(NULL));
+
 void ImageUtil::shuffleDataset(const cv::Mat &examplesIn, const cv::Mat &classesIn, cv::Mat* shuffledExamplesOut, cv::Mat *shuffledClassesOut )
 {
 	// Ensure that the given examples and classes are equal in size.  Only do work if we're given output pointers.
 	if ( examplesIn.size().height == classesIn.size().height && shuffledExamplesOut && shuffledClassesOut ) {
 
-		std::vector <int> seeds;
+		std::vector <int> indices;
 
 		// Make the output objects empty yet able to fit the width of the input objects.
 		shuffledExamplesOut->create(examplesIn.size().width, 0, examplesIn.type());
@@ -28,16 +37,17 @@ void ImageUtil::shuffleDataset(const cv::Mat &examplesIn, const cv::Mat &classes
 
 		// Build a list of indices.
 		for (int cont = 0; cont < examplesIn.rows; cont++) {
-			seeds.push_back(cont);
+			indices.push_back(cont);
 		}
 
 		// Randomly shuffle those indices.
-		cv::randShuffle(seeds);
+		cv::randShuffle(indices, indices.size(), &sRNG);
 
 		// Copy the values at the random indices to the output pointers.
 		for (int cont = 0; cont < examplesIn.rows; cont++) {
-			shuffledExamplesOut->push_back(examplesIn.row(seeds[cont]));
-			shuffledClassesOut->push_back(classesIn.row(seeds[cont]));
+			//std::cout << "seeds[cont]: " << indices[cont] << "\n";
+			shuffledExamplesOut->push_back(examplesIn.row(indices[cont]));
+			shuffledClassesOut->push_back(classesIn.row(indices[cont]));
 		}
 	}
 }

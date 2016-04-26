@@ -98,6 +98,8 @@ public:
 
 	void crossValidate(uint k = 10);
 
+	void graciaCrossValidate(uint k = 10);
+
 private:
 
 	// Path to the data set store.

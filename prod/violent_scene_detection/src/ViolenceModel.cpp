@@ -86,6 +86,88 @@ uint ViolenceModel::size()
 //
 
 
+void ViolenceModel::graciaCrossValidate(uint k )
+{
+
+	cv::Mat *examples, *classes;
+	if ( resolveDataStructures(&examples, &classes, NULL) ) {
+
+		// TODO: Figure out why those values that are 1 in classes come out as 255 when == 1 expression is used.
+		//		 In the meantime, just divide by 255 to yield 1.
+		cv::Mat positives = ((*classes) == 1)/255;
+		cv::Mat negatives = ((*classes) == 0)/255;
+
+		//std::cout << "pos: " << positives << "\n";
+		//std::cout << "neg: " << negatives << "\n";
+
+		std::cout << "graciaCrossValidate\n";
+
+		uint positiveCount = cv::sum(positives)[0];
+		uint negativeCount = cv::sum(negatives)[0];
+		uint equalizedCount = std::min(positiveCount, negativeCount);
+		std::cout << "negatives: " << negativeCount << " positives: " << positiveCount << " min: " << equalizedCount << "\n";
+		equalizedCount /= 2;
+
+		cv::Mat shuffledExamples, shuffledClasses, randomPositiveEx, randomPositiveCl, randomNegativeEx, randomNegativeCl;
+		ImageUtil::shuffleDataset(*examples, *classes, &shuffledExamples, &shuffledClasses);
+		std::cout << "shEx size: " << shuffledExamples.size() << " shCl size: " << shuffledClasses.size() << "\n";
+
+		uint dsi = 0; // This is horribly inefficient!! Shame!!
+		cv::Mat validationEx, validationCl;
+		for ( dsi = 0; dsi < shuffledExamples.size().height; dsi++ ) {
+
+			if ( shuffledClasses.at<int>(dsi, 0) == 1 && randomPositiveCl.size().height != equalizedCount ) {
+				//std::cout << "found positive at dsi: " << dsi << "\n";
+				randomPositiveCl.push_back(shuffledClasses.row(dsi));
+				randomPositiveEx.push_back(shuffledExamples.row(dsi));
+			} else if ( shuffledClasses.at<int>(dsi, 0) == 0 && randomNegativeCl.size().height != equalizedCount ) {
+				//std::cout << "found negative at dsi: " << dsi << "\n";
+				randomNegativeCl.push_back(shuffledClasses.row(dsi));
+				randomNegativeEx.push_back(shuffledExamples.row(dsi));
+			} else  {
+				// If the sample can't go into one of the specific training sets, put it into validation set.
+				validationEx.push_back( shuffledExamples.row(dsi) );
+				validationCl.push_back( shuffledClasses.row(dsi) );
+			}
+
+		}
+
+		std::cout << "randNegClSize: " << randomNegativeCl.size() << " randPosClSize: " << randomPositiveCl.size() << "\n";
+		std::cout << "randNegExSize: " << randomNegativeEx.size() << " randPosExSize: " << randomPositiveEx.size() << "\n";
+		std::cout << "the rest of randomized data set will be used for validation from row " << dsi << " to " << shuffledClasses.size().height << "\n";
+		assert(randomNegativeCl.size() == randomPositiveCl.size() && randomNegativeEx.size() == randomPositiveEx.size());
+		cv::Mat randomizedTrainingEx, randomizedTrainingCl;
+
+		// Add the random positive and negative training examples and classes together.
+		randomizedTrainingEx.push_back(randomPositiveEx);
+		randomizedTrainingEx.push_back(randomNegativeEx);
+
+		randomizedTrainingCl.push_back(randomPositiveCl);
+		randomizedTrainingCl.push_back(randomNegativeCl);
+
+		std::cout << "randTrainEx: " << randomizedTrainingEx.size() << " randomizedTrainingCl: " << randomizedTrainingCl.size() << "\n";
+		cv::Mat randTrainExCopy, randTrainClCopy;
+		learningKernel.train(randomizedTrainingEx, cv::ml::ROW_SAMPLE, randomizedTrainingCl);
+
+		cv::Mat predictedCl;
+		std::cout << "valEx " << validationEx.size() << " valCl " << validationCl.size() << "\n";
+
+		cv::Mat neg = ((validationCl) == 1)/255;
+		cv::Mat pos = ((validationCl) == 0)/255;
+		uint posCount = cv::sum(pos)[0];
+		uint negCount = cv::sum(neg)[0];
+		std::cout << "validations positives : " << posCount << " validation negatives: " << negCount << "\n";
+
+		learningKernel.predict(validationEx, predictedCl);
+		int TP = cv::sum(ImageUtil::trueResults(true, predictedCl, validationCl))[0];
+		int TN = cv::sum(ImageUtil::trueResults(false, predictedCl, validationCl))[0];
+		int totalAcc = TP + TN;
+		std::cout << "true positives: " << TP << " true negatives: " << TN << " acc: " << (float(totalAcc) / predictedCl.size().height) << "\n";
+
+	}
+
+}
+
 void ViolenceModel::crossValidate(uint k)
 {
 	cv::Mat *examples, *classes;
@@ -97,12 +179,12 @@ void ViolenceModel::crossValidate(uint k)
 		// Classes and examples are randomized on the same indices, meaning that they're still aligned example to class correctly.
 		cv::Mat randomExamples, randomClasses;
 		ImageUtil::shuffleDataset(*examples, *classes, &randomExamples, &randomClasses);
-		//std::cout << "randomExamples: " << randomExamples << " randomClasses: " << randomClasses << "\n";
+		//std::cout /*<< "randomExamples: " << randomExamples*/ << " randomClasses: " << randomClasses << "\n";
 
 		uint ki_size = examples->size().height / k;
-		std::cout << "cross validate ki_size: " << ki_size << "\n";
-		cv::Mat randomSubExamples;//(examples->size().width, ki_size, examples->type());
-		cv::Mat randomSubClasses;//(classes->size().width, ki_size, classes->type());
+		std::cout << "\ncross validate ki_size: " << ki_size << "\n\n";
+		cv::Mat randomSubExamples;
+		cv::Mat randomSubClasses;
 
 		// The previously used examples and classes.  This allows us to step through the randomized samples efficiently,
 		// while remembering the ones we used in the past.
@@ -113,7 +195,7 @@ void ViolenceModel::crossValidate(uint k)
 		{
 			// The offset into the training data that represents the beginning of region ki.
 			uint k_offset_begin = ki * ki_size;
-			uint k_offset_end   = k_offset_begin + ki_size - 1;//( ( ki + 1 ) * k ) - 1;
+			uint k_offset_end   = k_offset_begin + ki_size - 1;
 			std::cout << "k_offset_begin: " << k_offset_begin << " k_offset_end: " << k_offset_end << "\n";
 
 			// The range of this sub region in the data.
@@ -134,6 +216,7 @@ void ViolenceModel::crossValidate(uint k)
 				currentTrainingClasses.push_back( prevSubClasses[i] );
 			}
 
+			std::cout << "currentTrainingExamples " << currentTrainingExamples.size() << "\n";
 			// Add the currently used sub regions so that the can be added to the training set on the next iteration.
 			prevSubExamples.push_back( randomSubExamples.clone() );
 			prevSubClasses.push_back( randomSubClasses.clone() );
@@ -142,15 +225,21 @@ void ViolenceModel::crossValidate(uint k)
 			learningKernel.train(currentTrainingExamples, cv::ml::ROW_SAMPLE, currentTrainingClasses);
 			learningKernel.predict(randomSubExamples, predictions);
 
+			cv::Mat positives = ((randomSubClasses) == 1)/255;
+			cv::Mat negatives = ((randomSubClasses) == 0)/255;
+			uint positiveCount = cv::sum(positives)[0];
+			uint negativeCount = cv::sum(negatives)[0];
+			std::cout << "validations positives : " << positiveCount << " validation negatives: " << negativeCount << "\n";
+
 			int TP = cv::sum(ImageUtil::trueResults(true, predictions, randomSubClasses))[0];
 			int TN = cv::sum(ImageUtil::trueResults(false, predictions, randomSubClasses))[0];
 
-			std::cout << "true positives: " << TP << " true negatives: " << TN << "\n";
+			std::cout << "true positives: " << TP << " true negatives: " << TN << " size: " << predictions.size().height << "\n\n";
 			runningTP += TP; runningTN += TN;
 		}
 
 		uint totalAccurate = runningTP + runningTN;
-		std::cout << "totalTP: " << runningTP << " totalTN: " << runningTN << " totalAccurate: " << totalAccurate << " mean accurate: " << float(totalAccurate) / (k * ki_size) << "\n";
+		std::cout << "totalTP: " << runningTP << " totalTN: " << runningTN << " totalAccurate: " << totalAccurate << " mean accurate: " << float(totalAccurate) / examples->size().height << "\n\n";
 
 	} else {
 		std::cout << "cross validation failed: couldn't resolve data structures.\n";
@@ -164,7 +253,7 @@ void ViolenceModel::clear()
 	cv::Mat *exampleStore, *classStore;
 	std::map<std::string, time_t> *indexCache;
 
-	resolveDataStructures(/*ViolenceModel::TRAINING,*/ &exampleStore, &classStore, &indexCache);
+	resolveDataStructures(&exampleStore, &classStore, &indexCache);
 	if ( exampleStore && classStore && indexCache) {
 		exampleStore->create(0, 0, CV_32F);
 		classStore->create(0, 0, CV_32S);
@@ -208,7 +297,7 @@ void ViolenceModel::index(std::string resourcePath, bool isViolent)
 
 		// Create a VideoCapture instance bound to the path.
 		cv::VideoCapture capture(resourcePath);
-		std::vector<cv::Mat> trainingSample = extractFeatures(capture, resourcePath, 50);
+		std::vector<cv::Mat> trainingSample = extractFeatures(capture, resourcePath);
 		addSample( path, trainingSample, isViolent);
 
 	} else {
