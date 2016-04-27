@@ -22,11 +22,14 @@ public:
 	 * Constructor.
 	 * @param points - A vector of the pixel coordinates that describes the contour of the blob.
 	 */
-	ImageBlob(std::vector<cv::Point> points = std::vector<cv::Point>());
+	ImageBlob(std::vector<cv::Point> points = std::vector<cv::Point>(), uint ordinal = 0);
 	virtual ~ImageBlob();
+
+	uint ordinal() { return m_ordinal; }
 
 	// Implementation for ordering of blobs area.
 	bool operator < (const ImageBlob &bRight) const;
+	bool operator > (const ImageBlob &bRight) const;
 
 	// Retrieves a copy of the points.
 	std::vector<cv::Point> points() const;
@@ -46,7 +49,7 @@ public:
 
 private:
 	std::vector<cv::Point> m_points;
-
+	uint m_ordinal;
 };
 
 std::ostream& operator << (std::ostream &strm, const ImageBlob &a);

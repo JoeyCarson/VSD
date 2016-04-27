@@ -8,8 +8,9 @@
 #include "ImageBlob.h"
 
 
-ImageBlob::ImageBlob(std::vector<cv::Point> points)
-: m_points(points)
+ImageBlob::ImageBlob(std::vector<cv::Point> points, uint ordinal)
+: m_points(points),
+  m_ordinal(ordinal)
 {
 
 }
@@ -45,6 +46,13 @@ bool ImageBlob::operator < (const ImageBlob &bRight) const
 	double thisArea = this->area();
 	double rightArea = bRight.area();
 	return thisArea < rightArea;
+}
+
+bool ImageBlob::operator > (const ImageBlob &bRight) const
+{
+	double thisArea = this->area();
+	double rightArea = bRight.area();
+	return thisArea > rightArea;
 }
 
 float ImageBlob::distanceFrom(const ImageBlob &other)
