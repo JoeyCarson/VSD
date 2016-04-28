@@ -152,8 +152,8 @@ void ViolenceModel::graciaCrossValidate(uint k )
 		cv::Mat predictedCl;
 		std::cout << "valEx " << validationEx.size() << " valCl " << validationCl.size() << "\n";
 
-		cv::Mat neg = ((validationCl) == 1)/255;
-		cv::Mat pos = ((validationCl) == 0)/255;
+		cv::Mat pos = ((validationCl == 1) &= 1);
+		cv::Mat neg = ((validationCl == 0) &= 1);
 		uint posCount = cv::sum(pos)[0];
 		uint negCount = cv::sum(neg)[0];
 		std::cout << "validations positives : " << posCount << " validation negatives: " << negCount << "\n";
@@ -225,8 +225,8 @@ void ViolenceModel::crossValidate(uint k)
 			learningKernel.train(currentTrainingExamples, cv::ml::ROW_SAMPLE, currentTrainingClasses);
 			learningKernel.predict(randomSubExamples, predictions);
 
-			cv::Mat positives = ((randomSubClasses) == 1)/255;
-			cv::Mat negatives = ((randomSubClasses) == 0)/255;
+			cv::Mat positives = ((randomSubClasses == 1) &= 1);
+			cv::Mat negatives = ((randomSubClasses == 0) &= 1);
 			uint positiveCount = cv::sum(positives)[0];
 			uint negativeCount = cv::sum(negatives)[0];
 			std::cout << "validations positives : " << positiveCount << " validation negatives: " << negativeCount << "\n";
@@ -336,8 +336,8 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 	cv::Mat currentFrame, prevFrame;
 
 	// Create a max heap for keeping track of the largest blobs.
-	boost::heap::priority_queue<ImageBlob> topBlobsHeap;
-	topBlobsHeap.reserve(GRACIA_K);
+	std::priority_queue<ImageBlob, std::vector<ImageBlob>, std::greater<ImageBlob>> topBlobsHeap;
+	//topBlobsHeap.reserve(GRACIA_K);
 
 	bool capPrevSuccess = false;
 	bool capCurrSuccess = false;
@@ -349,7 +349,8 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 
 	// Load the prev frame with the first frame and current with the second
 	// so that we can simply loop and compute.
-	for ( uint frameIndex = 0, capPrevSuccess = capture.read(prevFrame), capCurrSuccess = capture.read(currentFrame);
+	uint frameIndex = 0, blobOrdinal = 0;
+	for ( frameIndex = 0, capPrevSuccess = capture.read(prevFrame), capCurrSuccess = capture.read(currentFrame);
 		  capPrevSuccess && capCurrSuccess && (frameCount == 0 || frameIndex < ( frameCount - 1 ) );
 		  prevFrame = currentFrame, capCurrSuccess = capture.read(currentFrame), frameIndex++ )
 	{
@@ -382,7 +383,9 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		// Compute absolute binarized difference.
 		cv::Mat absDiff, binAbsDiff;
 		cv::absdiff(prevFrame, currentFrame, absDiff);
-		cv::threshold ( absDiff, binAbsDiff, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU );
+
+		double thresh = 255 * 0.2;
+		cv::threshold ( absDiff, binAbsDiff, thresh, 1 /*255*/, cv::THRESH_BINARY /* | cv::THRESH_OTSU */ );
 
 		// Output binAbsDiff for debug purposes.
 		boost::filesystem::path bpath(sequenceName);
@@ -399,15 +402,18 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		// See http://www.boost.org/doc/libs/1_39_0/libs/bimap/doc/html/boost_bimap/one_minute_tutorial.html
 		BOOST_FOREACH(std::vector<cv::Point> cont, contours)
 		{
-			ImageBlob blob(cont);
+			ImageBlob blob(cont, blobOrdinal++);
 
 			if ( topBlobsHeap.size() < GRACIA_K ) {
 				// The heap isn't full yet, we can simply keep adding.
-				topBlobsHeap.emplace(blob);
-			} else if ( topBlobsHeap.top().area() < blob.area()) {
+				topBlobsHeap.push(blob);
+				//std::cout << "adding blob to heap " << blob.ordinal() << " area: " << blob.area() << "\n";
+			} else if ( topBlobsHeap.top() < blob) {
 				// The new blob is larger and the heap is full, so bump out the top one.
+				ImageBlob old = topBlobsHeap.top();
+				//std::cout << "popping and overwriting the largest blob" << " old area: " << old.area() <<  " new area: " << blob.area() << "\n";
 				topBlobsHeap.pop();
-				topBlobsHeap.emplace(blob);
+				topBlobsHeap.push(blob);
 			}
 		}
 	}
@@ -416,15 +422,24 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 	// load up blank ImageBlobs just to fill out the vector.
 	while ( topBlobsHeap.size() < GRACIA_K) {
 		std::cout << "Adding blank ImageBlob to top blobs heap.\n";
-		topBlobsHeap.emplace(ImageBlob());
+		topBlobsHeap.emplace( ImageBlob(std::vector<cv::Point>(), blobOrdinal++) );
 	}
 
 	// Read the ordered blobs back as an ordered list.
 	std::vector<ImageBlob> blobs;
 	while ( !topBlobsHeap.empty() ) {
-		blobs.push_back( topBlobsHeap.top() );
+		ImageBlob b = topBlobsHeap.top();
 		topBlobsHeap.pop();
+		std::cout << "writing blob to vector: ordinal: " << b.ordinal() << " area: " << b.area() << "\n";
+		blobs.push_back( b );
 	}
+
+
+//	std::map<uint, ImageBlob>::iterator itr;
+//	for ( itr = ordinalBlobMap.begin(); itr != ordinalBlobMap.end(); itr++ ) {
+//		std::cout << "writing ordinal to vector " << itr->second.ordinal() << " area: " << itr->second.area() << "\n";
+//		blobs.push_back(itr->second);
+//	}
 
 	// Build a single training sample for each algorithm.
 	std::vector<cv::Mat> trainingSample = buildSample(blobs);
