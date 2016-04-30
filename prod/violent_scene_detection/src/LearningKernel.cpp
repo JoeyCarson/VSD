@@ -21,8 +21,8 @@ LearningKernel::LearningKernel(std::string modelPath)
 void LearningKernel::initRandomTrees()
 {
 	std::cout << "init random trees\n";
-	m_pTrees->setMaxDepth(500);
-	m_pTrees->setMinSampleCount(4);
+	m_pTrees->setMaxDepth(2000);
+	m_pTrees->setMinSampleCount(50);
 
 	cv::TermCriteria criteria(cv::TermCriteria::COUNT, 50, 0);
 	m_pTrees->setTermCriteria(criteria);

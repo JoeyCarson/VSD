@@ -98,7 +98,7 @@ int main(int argc, char* argv[]) {
 
 	if ( options[PREDICT] ) {
 		std::string predictArg = options[PREDICT].arg;
-		vm.predict(predictArg, 1);
+		vm.predict(predictArg, 2);
 	}
 
     return 0;

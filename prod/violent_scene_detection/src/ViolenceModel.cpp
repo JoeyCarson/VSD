@@ -370,6 +370,8 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 
 		}
 
+		ImageUtil::detectPersonRectangles(currentFrame);
+
 		// Filter the current frame.
 		cv::Mat currentOut;
 		cv::cvtColor(currentFrame, currentOut, CV_RGB2GRAY);
@@ -421,7 +423,7 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 	// If for whatever reason, enough blobs weren't found and added into the heap,
 	// load up blank ImageBlobs just to fill out the vector.
 	while ( topBlobsHeap.size() < GRACIA_K) {
-		std::cout << "Adding blank ImageBlob to top blobs heap.\n";
+		//std::cout << "Adding blank ImageBlob to top blobs heap.\n";
 		topBlobsHeap.emplace( ImageBlob(std::vector<cv::Point>(), blobOrdinal++) );
 	}
 
@@ -430,7 +432,7 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 	while ( !topBlobsHeap.empty() ) {
 		ImageBlob b = topBlobsHeap.top();
 		topBlobsHeap.pop();
-		std::cout << "writing blob to vector: ordinal: " << b.ordinal() << " area: " << b.area() << "\n";
+		//std::cout << "writing blob to vector: ordinal: " << b.ordinal() << " area: " << b.area() << "\n";
 		blobs.push_back( b );
 	}
 
@@ -445,7 +447,7 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 	std::vector<cv::Mat> trainingSample = buildSample(blobs);
 
 	gettimeofday(&end, NULL);
-	std::cout << "extractFeatures takes: " << (end.tv_sec)  - begin.tv_sec << " s\n";
+	//std::cout << "extractFeatures takes: " << (end.tv_sec)  - begin.tv_sec << " s\n";
 
 	return trainingSample;
 }
@@ -469,14 +471,30 @@ void ViolenceModel::predict(boost::filesystem::path filePath, float timeInterval
 
 		double frameRate = cap.get(CV_CAP_PROP_FPS);
 		const uint framesPerExtraction = frameRate * timeInterval;
+		int continuousViolentCount = 0;
+		float time = 0;
+
 		// Try to predict across 20 frames each time until the capture is empty.
 		for ( double totalFrames = cap.get(CV_CAP_PROP_FRAME_COUNT); totalFrames > 0; totalFrames -= framesPerExtraction )
 		{
 			cv::Mat output;
 			std::vector<cv::Mat> featureRowVector = extractFeatures(cap, "prediction", framesPerExtraction);
+			time += timeInterval;
 			float resp = learningKernel.predict(featureRowVector[0], output);
 
-			std::cout << "learning kernel -> predict returns: " << resp << " predicts: " << output << "\n";
+			int isViolent = output.at<int>(0, 0);
+			//std::cout << "learning kernel -> predict returns: " << resp << " predicts: " << isViolent << "\n";
+
+			if ( isViolent ) {
+				continuousViolentCount++;
+			} else {
+				continuousViolentCount = 0;
+			}
+
+			if ( continuousViolentCount >= 1 ) {
+				std::cout << "aggression detected at " << time/60 << "s. \a\n";
+			}
+
 		}
 
 	} else {

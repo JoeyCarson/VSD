@@ -13,9 +13,10 @@
 
 #include <boost/foreach.hpp>
 
+
 #define DEBUG_OUTPUT_DIR "./debug"
 
-
+// OpenCV seems to require us to define our own random number generator.
 struct RNG {
     int operator() (int n) {
         return std::rand() / (1.0 + RAND_MAX) * n;
@@ -23,6 +24,39 @@ struct RNG {
 };
 
 static cv::RNG sRNG(time(NULL));
+
+std::vector<cv::Rect> ImageUtil::detectPersonRectangles(cv::Mat image, cv::Mat *outputMask)
+{
+	cv::HOGDescriptor HOG;
+	HOG.setSVMDetector(cv::HOGDescriptor::getDefaultPeopleDetector());
+
+	std::vector<cv::Rect> found;
+	HOG.detectMultiScale(image, found, -1, cv::Size(8,8), cv::Size(32,32), 1.05, 2);
+
+	if ( outputMask )
+	{
+		// Create a new zero image of size and type equal to the input image.
+		*outputMask = cv::Mat::zeros(image.size(), image.type());
+		cv::Mat channelMask = cv::Mat(1, image.channels(), CV_8U, {0xFF});
+
+		// Write each rectangle as a matrix of 0xFF, signifying the mask to keep the full rectangle in the output image.
+		for (int i = 0; i < found.size(); i++) {
+			cv::Rect r = found[i];
+			std::cout << " HOG detected rectangle " << i << " : " << r << "\n";
+			(*outputMask)(r) |= channelMask;
+		}
+
+		///*
+		static int index = 0;
+		cv::Mat maskedImage = image & *outputMask;
+		std::stringstream name;
+		name << "masked_" << index++;
+		ImageUtil::dumpDebugImage(maskedImage, name.str());
+		//*/
+	}
+
+	return found;
+}
 
 void ImageUtil::shuffleDataset(const cv::Mat &examplesIn, const cv::Mat &classesIn, cv::Mat* shuffledExamplesOut, cv::Mat *shuffledClassesOut )
 {

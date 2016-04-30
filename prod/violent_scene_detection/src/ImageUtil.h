@@ -14,6 +14,14 @@ class ImageUtil {
 
 public:
 
+	/**
+	 * Detect person rectangles in the given image.  Optionally computes a mask that can be used to segment the person rectangles in the image.
+	 * @param image - The image to detect person rectangles in.
+	 * @param outputMask - Pointer to a image that will be populated as a mask that can be used to segment detected person rectangles.
+	 * @return An std::vector<cv::Point> containing the detected person rectangles.
+	 */
+	static std::vector<cv::Rect> detectPersonRectangles(cv::Mat image, cv::Mat *outputMask = NULL);
+
 	// Writes the given matrix into the debug output directory.
 	static void dumpDebugImage(cv::Mat image, std::string outputFileName);
 
