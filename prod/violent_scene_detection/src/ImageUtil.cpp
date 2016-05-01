@@ -42,17 +42,17 @@ std::vector<cv::Rect> ImageUtil::detectPersonRectangles(cv::Mat image, cv::Mat *
 		// Write each rectangle as a matrix of 0xFF, signifying the mask to keep the full rectangle in the output image.
 		for (int i = 0; i < found.size(); i++) {
 			cv::Rect r = found[i];
-			std::cout << " HOG detected rectangle " << i << " : " << r << "\n";
+			//std::cout << " HOG detected rectangle " << i << " : " << r << "\n";
 			(*outputMask)(r) |= channelMask;
 		}
 
-		///*
+		/*
 		static int index = 0;
 		cv::Mat maskedImage = image & *outputMask;
 		std::stringstream name;
 		name << "masked_" << index++;
 		ImageUtil::dumpDebugImage(maskedImage, name.str());
-		//*/
+		*/
 	}
 
 	return found;
@@ -127,6 +127,7 @@ void ImageUtil::dumpDebugImage(cv::Mat image, std::string outputFileName)
 	//std::cout << "mat: " << outMatFilePathStream.str() << "\n";
 
 	cv::FileStorage file(outMatFilePathStream.str(), cv::FileStorage::WRITE);
+	//std::cout << "writing output file name to matrix: " << outputFileName << "\n";
 	file << outputFileName.c_str() << image;
 	file.release();
 

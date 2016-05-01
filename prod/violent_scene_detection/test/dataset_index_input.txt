@@ -4,8 +4,8 @@
 # Example: 0 1 video/definitely_has_fighting.mp4 => train violent video/definitely_has_fighting.mp4
 # These lines are directories, so all first level children will be indexed
 # with the same class. 
- 1 video/HockeyFights_Violent
- 0 video/HockeyFights_NonViolent
- 0 video/TVHumanInteraction_NonViolent
+ #1 video/HockeyFights_Violent
+ #0 video/HockeyFights_NonViolent
+ #0 video/TVHumanInteraction_NonViolent
  1 video/ucf101_Violent
- 0 video/ucf101_NonViolent
+ #0 video/ucf101_NonViolent

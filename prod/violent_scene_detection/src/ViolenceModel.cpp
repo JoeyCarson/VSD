@@ -337,7 +337,6 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 
 	// Create a max heap for keeping track of the largest blobs.
 	std::priority_queue<ImageBlob, std::vector<ImageBlob>, std::greater<ImageBlob>> topBlobsHeap;
-	//topBlobsHeap.reserve(GRACIA_K);
 
 	bool capPrevSuccess = false;
 	bool capCurrSuccess = false;
@@ -350,44 +349,56 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 	// Load the prev frame with the first frame and current with the second
 	// so that we can simply loop and compute.
 	uint frameIndex = 0, blobOrdinal = 0;
+	cv::Mat current_person_mask, prev_person_mask;
 	for ( frameIndex = 0, capPrevSuccess = capture.read(prevFrame), capCurrSuccess = capture.read(currentFrame);
 		  capPrevSuccess && capCurrSuccess && (frameCount == 0 || frameIndex < ( frameCount - 1 ) );
-		  prevFrame = currentFrame, capCurrSuccess = capture.read(currentFrame), frameIndex++ )
+		  prev_person_mask = current_person_mask.clone(), prevFrame = currentFrame.clone(), capCurrSuccess = capture.read(currentFrame), frameIndex++ )
 	{
-
+		// TODO: Eventually we should get this common scaling working.
 		cv::Size targetSize(TARGET_COMMON_WIDTH, TARGET_COMMON_HEIGHT);
 
 		// Convert to grayscale.
-		if ( frameIndex == 0 ) {
+		if ( frameIndex == 0 )
+		{
+			// It's only necessary to pre-process the previous frame on the first iteration,
+			// as subsequent previous frames will be equal to the current frame in an earlier iteration.
+			ImageUtil::detectPersonRectangles(prevFrame, &prev_person_mask);
+
 			cv::Mat grayOut;
-			// It's only necessary to gray scale filter the previous frame on the first iteration,
-			// as each time the current frame will be equal to the prev frame, which was already filtered.
 			cv::cvtColor(prevFrame, grayOut, CV_RGB2GRAY);
 			prevFrame = grayOut;
-			//prevFrame = ImageUtil::scaleImageIntoRect(prevFrame, targetSize);
-			//cv::imshow("first", prevFrame);
-			//cv::waitKey();
+			//ImageUtil::dumpDebugImage(prevFrame, "prev_frame");
 
+			// TODO: Scale to as close to target size as possible, using ImageUtil::scaleImageIntoRect.  After it works of course.
 		}
 
-		ImageUtil::detectPersonRectangles(currentFrame);
+		// Detect persons in current frame.
+		ImageUtil::detectPersonRectangles(currentFrame, &current_person_mask);
 
 		// Filter the current frame.
 		cv::Mat currentOut;
 		cv::cvtColor(currentFrame, currentOut, CV_RGB2GRAY);
 		currentFrame = currentOut;
 
-		// Scale to as close to target size as possible.
-		//currentFrame = ImageUtil::scaleImageIntoRect(currentFrame, targetSize);
-		//cv::imshow("current", currentFrame);
-		//cv::waitKey();
+		// TODO: Scale to as close to target size as possible, using ImageUtil::scaleImageIntoRect.  After it works of course..
 
-		// Compute absolute binarized difference.
+		// Compute absolute difference.
 		cv::Mat absDiff, binAbsDiff;
 		cv::absdiff(prevFrame, currentFrame, absDiff);
 
+		// Binarize the absolute difference.
 		double thresh = 255 * 0.2;
-		cv::threshold ( absDiff, binAbsDiff, thresh, 1 /*255*/, cv::THRESH_BINARY /* | cv::THRESH_OTSU */ );
+		cv::threshold ( absDiff, binAbsDiff, thresh, 255, cv::THRESH_BINARY );
+
+		// Mask out any differences where persons weren't detected in either frame.
+		// The inter-frame mask must be converted to grayscale because it was generated based on the original
+		// color images.  Dalal and Triggs found that HOG performance is better on color images than grayscale.
+		// The person masks that are generated are binary spatial masks (all components of each pixel either 0 or 255).
+		// Therefore, no information is lost in conversion.
+		cv::Mat interframe_person_mask = prev_person_mask | current_person_mask;
+		cv::cvtColor(interframe_person_mask, interframe_person_mask, CV_RGB2GRAY);
+		//std::cout << "diff: " << binAbsDiff.size() << " " << binAbsDiff.type() << " mask: " << interframe_person_mask.size() << " " << interframe_person_mask.type() << "\n";
+		binAbsDiff &= interframe_person_mask;
 
 		// Output binAbsDiff for debug purposes.
 		boost::filesystem::path bpath(sequenceName);
@@ -397,8 +408,8 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 
 		// Find the contours (blobs) and use them to compute centroids, area, etc.
 		// http://opencv.itseez.com/2.4/doc/tutorials/imgproc/shapedescriptors/moments/moments.html?highlight=moment#code
-		std::vector<std::vector<cv::Point>> contours;
 		std::vector<cv::Vec4i> hierarchy;
+		std::vector<std::vector<cv::Point>> contours;
 		cv::findContours(binAbsDiff, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
 
 		// See http://www.boost.org/doc/libs/1_39_0/libs/bimap/doc/html/boost_bimap/one_minute_tutorial.html
@@ -436,18 +447,11 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		blobs.push_back( b );
 	}
 
-
-//	std::map<uint, ImageBlob>::iterator itr;
-//	for ( itr = ordinalBlobMap.begin(); itr != ordinalBlobMap.end(); itr++ ) {
-//		std::cout << "writing ordinal to vector " << itr->second.ordinal() << " area: " << itr->second.area() << "\n";
-//		blobs.push_back(itr->second);
-//	}
-
 	// Build a single training sample for each algorithm.
 	std::vector<cv::Mat> trainingSample = buildSample(blobs);
 
 	gettimeofday(&end, NULL);
-	//std::cout << "extractFeatures takes: " << (end.tv_sec)  - begin.tv_sec << " s\n";
+	std::cout << "extractFeatures takes: " << (end.tv_sec)  - begin.tv_sec << " s\n";
 
 	return trainingSample;
 }
