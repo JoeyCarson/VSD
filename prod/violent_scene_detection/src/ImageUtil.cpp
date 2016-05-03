@@ -37,13 +37,13 @@ std::vector<cv::Rect> ImageUtil::detectPersonRectangles(cv::Mat image, cv::Mat *
 	{
 		// Create a new zero image of size and type equal to the input image.
 		*outputMask = cv::Mat::zeros(image.size(), image.type());
-		cv::Mat channelMask = cv::Mat(1, image.channels(), CV_8U, {0xFF});
+		cv::Mat channelMaskPreserve = cv::Mat(1, image.channels(), CV_8U, {0xFF});
 
 		// Write each rectangle as a matrix of 0xFF, signifying the mask to keep the full rectangle in the output image.
 		for (int i = 0; i < found.size(); i++) {
 			cv::Rect r = found[i];
 			//std::cout << " HOG detected rectangle " << i << " : " << r << "\n";
-			(*outputMask)(r) |= channelMask;
+			(*outputMask)(r) |= channelMaskPreserve;
 		}
 
 		/*
@@ -90,7 +90,8 @@ cv::Mat ImageUtil::trueResults(bool positive, const cv::Mat &predictions, const 
 {
 	cv::Mat ANDResult;
 
-	if ( predictions.size() == groundTruth.size() ) {
+	if ( predictions.size() == groundTruth.size() )
+	{
 
 		cv::Mat classStoreCopy = groundTruth.clone();
 		cv::Mat predictedClassesCopy = predictions.clone();
@@ -164,11 +165,11 @@ void ImageUtil::createDebugDirectory()
 
 cv::Mat ImageUtil::scaleImageIntoRect(const cv::Mat img, cv::Size size)
 {
-	cv::Mat scaledImage; // Get a copy of the given image scaled to the scaled size.
 	cv::Size scaledSize = ImageUtil::fitSizePreservingAspectRatio(img.size(), size);
 
 	std::cout << "original image size: " << img.size() << " target fit size: " << size << " scaledImageSize: " << scaledSize << "\n";
 
+	cv::Mat scaledImage; // Get a copy of the given image scaled to the scaled size.
 	cv::resize(img, scaledImage, scaledSize);
 
 	int centerX = size.width/2;

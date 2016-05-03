@@ -45,6 +45,11 @@ public:
 	std::vector<cv::Mat> extractFeatures(cv::VideoCapture capture, std::string sequenceName = "", uint frameCount = 0);
 
 	/**
+	 * Preprocess the given frame, returning a mask identifying the persons in the image.
+	 */
+	static std::vector<cv::Rect> preprocess(cv::Mat &frame, cv::Mat *personMask);
+
+	/**
 	 * Index the resource in the file system represented by resourcePath into the training store.
 	 * This method extracts the feature vector and adds it to the training set.
 	 * @param resourcePath - The path to the input file to index as a training sample.

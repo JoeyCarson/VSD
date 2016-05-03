@@ -333,8 +333,6 @@ std::string ViolenceModel::createIndexKey(boost::filesystem::path resourcePath)
 std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, std::string sequenceName, const uint frameCount)
 {
 
-	cv::Mat currentFrame, prevFrame;
-
 	// Create a max heap for keeping track of the largest blobs.
 	std::priority_queue<ImageBlob, std::vector<ImageBlob>, std::greater<ImageBlob>> topBlobsHeap;
 
@@ -349,10 +347,11 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 	// Load the prev frame with the first frame and current with the second
 	// so that we can simply loop and compute.
 	uint frameIndex = 0, blobOrdinal = 0;
-	cv::Mat current_person_mask, prev_person_mask;
-	for ( frameIndex = 0, capPrevSuccess = capture.read(prevFrame), capCurrSuccess = capture.read(currentFrame);
-		  capPrevSuccess && capCurrSuccess && (frameCount == 0 || frameIndex < ( frameCount - 1 ) );
-		  prev_person_mask = current_person_mask.clone(), prevFrame = currentFrame.clone(), capCurrSuccess = capture.read(currentFrame), frameIndex++ )
+	cv::Mat current_person_mask, prev_person_mask, currentFrame, prevFrame;
+
+	for ( frameIndex = 0, capPrevSuccess = capture.read(prevFrame), capCurrSuccess = capture.read(currentFrame); // initialize
+		  capPrevSuccess && capCurrSuccess && (frameCount == 0 || frameIndex < ( frameCount - 1 ) ); // continue?
+		  prev_person_mask = current_person_mask.clone(), prevFrame = currentFrame.clone(), capCurrSuccess = capture.read(currentFrame), frameIndex++ ) // update
 	{
 		// TODO: Eventually we should get this common scaling working.
 		cv::Size targetSize(TARGET_COMMON_WIDTH, TARGET_COMMON_HEIGHT);
@@ -362,27 +361,13 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		{
 			// It's only necessary to pre-process the previous frame on the first iteration,
 			// as subsequent previous frames will be equal to the current frame in an earlier iteration.
-			ImageUtil::detectPersonRectangles(prevFrame, &prev_person_mask);
-
-			cv::Mat grayOut;
-			cv::cvtColor(prevFrame, grayOut, CV_RGB2GRAY);
-			prevFrame = grayOut;
-			//ImageUtil::dumpDebugImage(prevFrame, "prev_frame");
-
-			// TODO: Scale to as close to target size as possible, using ImageUtil::scaleImageIntoRect.  After it works of course.
+			ViolenceModel::preprocess(prevFrame, &prev_person_mask);
 		}
 
-		// Detect persons in current frame.
-		ImageUtil::detectPersonRectangles(currentFrame, &current_person_mask);
+		// Always preprocess the current frame.
+		ViolenceModel::preprocess(currentFrame, &current_person_mask);
 
-		// Filter the current frame.
-		cv::Mat currentOut;
-		cv::cvtColor(currentFrame, currentOut, CV_RGB2GRAY);
-		currentFrame = currentOut;
-
-		// TODO: Scale to as close to target size as possible, using ImageUtil::scaleImageIntoRect.  After it works of course..
-
-		// Compute absolute difference.
+		// Compute absolute difference between previous and current frames.
 		cv::Mat absDiff, binAbsDiff;
 		cv::absdiff(prevFrame, currentFrame, absDiff);
 
@@ -391,14 +376,13 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		cv::threshold ( absDiff, binAbsDiff, thresh, 255, cv::THRESH_BINARY );
 
 		// Mask out any differences where persons weren't detected in either frame.
-		// The inter-frame mask must be converted to grayscale because it was generated based on the original
-		// color images.  Dalal and Triggs found that HOG performance is better on color images than grayscale.
-		// The person masks that are generated are binary spatial masks (all components of each pixel either 0 or 255).
-		// Therefore, no information is lost in conversion.
 		cv::Mat interframe_person_mask = prev_person_mask | current_person_mask;
-		cv::cvtColor(interframe_person_mask, interframe_person_mask, CV_RGB2GRAY);
-		//std::cout << "diff: " << binAbsDiff.size() << " " << binAbsDiff.type() << " mask: " << interframe_person_mask.size() << " " << interframe_person_mask.type() << "\n";
-		binAbsDiff &= interframe_person_mask;
+
+		//if ( cv::countNonZero(interframe_person_mask) ) {
+			// Should we only apply the mask if it's not all zeros?
+			// If we apply it, then we end up with an empty frame.
+			binAbsDiff &= interframe_person_mask;
+		//}
 
 		// Output binAbsDiff for debug purposes.
 		boost::filesystem::path bpath(sequenceName);
@@ -419,8 +403,8 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 
 			if ( topBlobsHeap.size() < GRACIA_K ) {
 				// The heap isn't full yet, we can simply keep adding.
-				topBlobsHeap.push(blob);
 				//std::cout << "adding blob to heap " << blob.ordinal() << " area: " << blob.area() << "\n";
+				topBlobsHeap.push(blob);
 			} else if ( topBlobsHeap.top() < blob) {
 				// The new blob is larger and the heap is full, so bump out the top one.
 				ImageBlob old = topBlobsHeap.top();
@@ -431,24 +415,28 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		}
 	}
 
-	// If for whatever reason, enough blobs weren't found and added into the heap,
-	// load up blank ImageBlobs just to fill out the vector.
-	while ( topBlobsHeap.size() < GRACIA_K) {
-		//std::cout << "Adding blank ImageBlob to top blobs heap.\n";
-		topBlobsHeap.emplace( ImageBlob(std::vector<cv::Point>(), blobOrdinal++) );
-	}
+	std::vector<cv::Mat> trainingSample;
 
-	// Read the ordered blobs back as an ordered list.
-	std::vector<ImageBlob> blobs;
-	while ( !topBlobsHeap.empty() ) {
-		ImageBlob b = topBlobsHeap.top();
-		topBlobsHeap.pop();
-		//std::cout << "writing blob to vector: ordinal: " << b.ordinal() << " area: " << b.area() << "\n";
-		blobs.push_back( b );
-	}
+	if ( topBlobsHeap.size() == GRACIA_K ) {
+		// Read the ordered blobs back as an ordered list.
+		std::vector<ImageBlob> blobs;
 
-	// Build a single training sample for each algorithm.
-	std::vector<cv::Mat> trainingSample = buildSample(blobs);
+		while ( !topBlobsHeap.empty() ) {
+			ImageBlob b = topBlobsHeap.top();
+			topBlobsHeap.pop();
+			//std::cout << "writing blob to vector: ordinal: " << b.ordinal() << " area: " << b.area() << "\n";
+			blobs.push_back( b );
+		}
+
+		// Build a single training sample for each algorithm.
+		trainingSample = buildSample(blobs);
+
+	} else {
+		// If we weren't able to find enough motion blobs in the sequence, we shouldn't be committing it to the training store.
+		// Primarily because if we add too many zeros, it makes the sample ambiguous and contributes to what the learning kernel expects
+		// a positive or negative sample to be.  If we don't have enough motion blobs, print an error message and simply continue.
+		std::cout << "Sample produced only " << topBlobsHeap.size() << " motion blobs (" << GRACIA_K << " required) and is not being added to the index." << "\n";
+	}
 
 	gettimeofday(&end, NULL);
 	std::cout << "extractFeatures takes: " << (end.tv_sec)  - begin.tv_sec << " s\n";
@@ -456,11 +444,35 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 	return trainingSample;
 }
 
+std::vector<cv::Rect> ViolenceModel::preprocess(cv::Mat &frame, cv::Mat *personMask)
+{
+
+	// TODO: Scale to as close to target size as possible, using ImageUtil::scaleImageIntoRect.
+	//       After it works of course.
+	std::vector<cv::Rect> rectangles = ImageUtil::detectPersonRectangles(frame, personMask);
+
+	if ( personMask ) {
+		// If we've been given an output pointer for the person mask, it must be converted to grayscale,
+		// so that it's compatible with the given image after we convert it to grayscale.
+		// We intentionally detect person rectangles using the source image, as HOG performance is known
+		// to be slightly degraded when computed on grayscale images.
+		cv::cvtColor(*personMask, *personMask, CV_RGB2GRAY);
+		//ImageUtil::dumpDebugImage(*personMask, "mask");
+	}
+
+	cv::Mat grayOut;
+	cv::cvtColor(frame, grayOut, CV_RGB2GRAY);
+	frame = grayOut;
+
+	return rectangles;
+}
+
 void ViolenceModel::train()
 {
 	// TODO: Pull an equal number of positive and negative examples.  Build a training data matrix on these.
 	cv::Mat *trainEx, *trainCl;
 	resolveDataStructures(&trainEx, &trainCl, NULL);
+
 	if ( trainEx && trainCl ) {
 		learningKernel.train(*trainEx, cv::ml::ROW_SAMPLE, *trainCl);
 	} else {
@@ -484,7 +496,7 @@ void ViolenceModel::predict(boost::filesystem::path filePath, float timeInterval
 			cv::Mat output;
 			std::vector<cv::Mat> featureRowVector = extractFeatures(cap, "prediction", framesPerExtraction);
 			time += timeInterval;
-			float resp = learningKernel.predict(featureRowVector[0], output);
+			learningKernel.predict(featureRowVector[0], output);
 
 			int isViolent = output.at<int>(0, 0);
 			//std::cout << "learning kernel -> predict returns: " << resp << " predicts: " << isViolent << "\n";
