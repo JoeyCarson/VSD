@@ -49,7 +49,7 @@ ViolenceModel::ViolenceModel(std::string trainingStorePath)
 
 uint ViolenceModel::size()
 {
-	std::map<std::string, time_t> *targetIndex;
+	std::map<std::string, time_t> *targetIndex = NULL;
 	resolveDataStructures(NULL, NULL, &targetIndex);
 	return targetIndex ? targetIndex->size() : 0;
 }
@@ -297,7 +297,7 @@ void ViolenceModel::index(std::string resourcePath, bool isViolent)
 
 		// Create a VideoCapture instance bound to the path.
 		cv::VideoCapture capture(resourcePath);
-		std::vector<cv::Mat> trainingSample = extractFeatures(capture, resourcePath);
+		cv::Mat trainingSample = extractFeatureVector(capture, resourcePath);
 		addSample( path, trainingSample, isViolent);
 
 	} else {
@@ -330,28 +330,25 @@ std::string ViolenceModel::createIndexKey(boost::filesystem::path resourcePath)
 	return resourcePath.generic_string();
 }
 
-std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, std::string sequenceName, const uint frameCount)
+cv::Mat ViolenceModel::extractFeatureVector(cv::VideoCapture capture, std::string sequenceName, const uint frameCount)
 {
-
-	// Create a max heap for keeping track of the largest blobs.
-	std::priority_queue<ImageBlob, std::vector<ImageBlob>, std::greater<ImageBlob>> topBlobsHeap;
-
 	bool capPrevSuccess = false;
 	bool capCurrSuccess = false;
 
-	// TODO: Should we need to try to open the capture if it's not?
+	cv::Mat interframeSamples;
 
+	// TODO: Should we need to try to open the capture if it's not?
 	timeval begin, end;
 	gettimeofday(&begin, NULL);
 
 	// Load the prev frame with the first frame and current with the second
 	// so that we can simply loop and compute.
-	uint frameIndex = 0, blobOrdinal = 0;
-	cv::Mat current_person_mask, prev_person_mask, currentFrame, prevFrame;
+	uint frameIndex = 0;
+	cv::Mat currentFrame, prevFrame;
 
 	for ( frameIndex = 0, capPrevSuccess = capture.read(prevFrame), capCurrSuccess = capture.read(currentFrame); // initialize
 		  capPrevSuccess && capCurrSuccess && (frameCount == 0 || frameIndex < ( frameCount - 1 ) ); // continue?
-		  prev_person_mask = current_person_mask.clone(), prevFrame = currentFrame.clone(), capCurrSuccess = capture.read(currentFrame), frameIndex++ ) // update
+		  prevFrame = currentFrame.clone(), capCurrSuccess = capture.read(currentFrame), frameIndex++ ) // update
 	{
 		// TODO: Eventually we should get this common scaling working.
 		cv::Size targetSize(TARGET_COMMON_WIDTH, TARGET_COMMON_HEIGHT);
@@ -361,11 +358,11 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		{
 			// It's only necessary to pre-process the previous frame on the first iteration,
 			// as subsequent previous frames will be equal to the current frame in an earlier iteration.
-			ViolenceModel::preprocess(prevFrame, &prev_person_mask);
+			ViolenceModel::preprocess(prevFrame);
 		}
 
 		// Always preprocess the current frame.
-		ViolenceModel::preprocess(currentFrame, &current_person_mask);
+		ViolenceModel::preprocess(currentFrame);
 
 		// Compute absolute difference between previous and current frames.
 		cv::Mat absDiff, binAbsDiff;
@@ -374,15 +371,6 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		// Binarize the absolute difference.
 		double thresh = 255 * 0.2;
 		cv::threshold ( absDiff, binAbsDiff, thresh, 255, cv::THRESH_BINARY );
-
-		// Mask out any differences where persons weren't detected in either frame.
-		cv::Mat interframe_person_mask = prev_person_mask | current_person_mask;
-
-		//if ( cv::countNonZero(interframe_person_mask) ) {
-			// Should we only apply the mask if it's not all zeros?
-			// If we apply it, then we end up with an empty frame.
-			binAbsDiff &= interframe_person_mask;
-		//}
 
 		// Output binAbsDiff for debug purposes.
 		boost::filesystem::path bpath(sequenceName);
@@ -396,62 +384,85 @@ std::vector<cv::Mat> ViolenceModel::extractFeatures(cv::VideoCapture capture, st
 		std::vector<std::vector<cv::Point>> contours;
 		cv::findContours(binAbsDiff, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
 
-		// See http://www.boost.org/doc/libs/1_39_0/libs/bimap/doc/html/boost_bimap/one_minute_tutorial.html
-		BOOST_FOREACH(std::vector<cv::Point> cont, contours)
-		{
-			ImageBlob blob(cont, blobOrdinal++);
+		// Grab the interframe sample and it add to the running set of interframe samples.
+		cv::Mat trainingSample = extractInterframeSampleFromContours(contours, GRACIA_K);
+		interframeSamples.push_back(trainingSample);
+	}
+    
+    // We've gathered a matrix of interframe samples each row looks like [k_areas][k_compactness][k!_distances].
+    cv::Mat histoFeature = buildHistogramFeature(interframeSamples, 8); // same as GRACIA_K?
+    
+	gettimeofday(&end, NULL);
+	std::cout << "extractFeatureVector takes: " << (end.tv_sec)  - begin.tv_sec << " s\n";
 
-			if ( topBlobsHeap.size() < GRACIA_K ) {
-				// The heap isn't full yet, we can simply keep adding.
-				//std::cout << "adding blob to heap " << blob.ordinal() << " area: " << blob.area() << "\n";
-				topBlobsHeap.push(blob);
-			} else if ( topBlobsHeap.top() < blob) {
-				// The new blob is larger and the heap is full, so bump out the top one.
-				ImageBlob old = topBlobsHeap.top();
-				//std::cout << "popping and overwriting the largest blob" << " old area: " << old.area() <<  " new area: " << blob.area() << "\n";
-				topBlobsHeap.pop();
-				topBlobsHeap.push(blob);
-			}
+	return histoFeature;
+}
+
+cv::Mat ViolenceModel::extractInterframeSampleFromContours(std::vector<std::vector<cv::Point>> contours, uint k)
+{
+	// Create a max heap for keeping track of the largest blobs.
+	std::priority_queue<ImageBlob, std::vector<ImageBlob>, std::greater<ImageBlob>> topBlobsHeap;
+	uint blobOrdinal = 0;
+	cv::Mat output;
+
+	// 1. Collect the top K largest blobs by area.
+	// Each contour is used to create an ImageBlob object that defines its own natural order by area.
+	// A heap is used to order them in descending order of area.
+	// See http://www.boost.org/doc/libs/1_39_0/libs/bimap/doc/html/boost_bimap/one_minute_tutorial.html
+	BOOST_FOREACH(std::vector<cv::Point> cont, contours)
+	{
+		ImageBlob blob(cont, blobOrdinal++);
+
+		if ( topBlobsHeap.size() < k ) {
+			// The heap isn't full yet, we can simply keep adding.
+			//std::cout << "adding blob to heap " << blob.ordinal() << " area: " << blob.area() << "\n";
+			topBlobsHeap.push(blob);
+		} else if ( topBlobsHeap.top() < blob) {
+			// The new blob is larger than the largest and the heap is full, so bump out the top one to make room for the talent.
+			ImageBlob old = topBlobsHeap.top();
+			//std::cout << "popping and overwriting the largest blob" << " old area: " << old.area() <<  " new area: " << blob.area() << "\n";
+			topBlobsHeap.pop();
+			topBlobsHeap.push(blob);
 		}
 	}
 
-	std::vector<cv::Mat> trainingSample;
-
-	if ( topBlobsHeap.size() == GRACIA_K ) {
+	// 2. Now that we've got the k largest blobs,
+	if ( topBlobsHeap.size() == k )
+	{
 		// Read the ordered blobs back as an ordered list.
 		std::vector<ImageBlob> blobs;
-
-		while ( !topBlobsHeap.empty() ) {
+		while ( !topBlobsHeap.empty() )
+		{
 			ImageBlob b = topBlobsHeap.top();
 			topBlobsHeap.pop();
+
 			//std::cout << "writing blob to vector: ordinal: " << b.ordinal() << " area: " << b.area() << "\n";
 			blobs.push_back( b );
 		}
 
-		// Build a single training sample for each algorithm.
-		trainingSample = buildSample(blobs);
-
-	} else {
+		output = buildInterframeSample(blobs);
+	}
+	else
+	{
 		// If we weren't able to find enough motion blobs in the sequence, we shouldn't be committing it to the training store.
 		// Primarily because if we add too many zeros, it makes the sample ambiguous and contributes to what the learning kernel expects
 		// a positive or negative sample to be.  If we don't have enough motion blobs, print an error message and simply continue.
-		std::cout << "Sample produced only " << topBlobsHeap.size() << " motion blobs (" << GRACIA_K << " required) and is not being added to the index." << "\n";
+		std::cout << "Sample produced only " << topBlobsHeap.size() << " motion blobs (" << k << " required) and is not being added to the index." << "\n";
 	}
 
-	gettimeofday(&end, NULL);
-	std::cout << "extractFeatures takes: " << (end.tv_sec)  - begin.tv_sec << " s\n";
-
-	return trainingSample;
+	return output;
 }
 
 std::vector<cv::Rect> ViolenceModel::preprocess(cv::Mat &frame, cv::Mat *personMask)
 {
 
-	// TODO: Scale to as close to target size as possible, using ImageUtil::scaleImageIntoRect.
-	//       After it works of course.
-	std::vector<cv::Rect> rectangles = ImageUtil::detectPersonRectangles(frame, personMask);
+	std::vector<cv::Rect> rectangles;
+	if ( personMask )
+	{
+		// TODO: Scale to as close to target size as possible, using ImageUtil::scaleImageIntoRect.
+		//       After it works of course.
+		rectangles = ImageUtil::detectPersonRectangles(frame, personMask);
 
-	if ( personMask ) {
 		// If we've been given an output pointer for the person mask, it must be converted to grayscale,
 		// so that it's compatible with the given image after we convert it to grayscale.
 		// We intentionally detect person rectangles using the source image, as HOG performance is known
@@ -494,9 +505,9 @@ void ViolenceModel::predict(boost::filesystem::path filePath, float timeInterval
 		for ( double totalFrames = cap.get(CV_CAP_PROP_FRAME_COUNT); totalFrames > 0; totalFrames -= framesPerExtraction )
 		{
 			cv::Mat output;
-			std::vector<cv::Mat> featureRowVector = extractFeatures(cap, "prediction", framesPerExtraction);
+			cv::Mat featureRowVector = extractFeatureVector(cap, "prediction", framesPerExtraction);
 			time += timeInterval;
-			learningKernel.predict(featureRowVector[0], output);
+			learningKernel.predict(featureRowVector, output);
 
 			int isViolent = output.at<int>(0, 0);
 			//std::cout << "learning kernel -> predict returns: " << resp << " predicts: " << isViolent << "\n";
@@ -519,7 +530,7 @@ void ViolenceModel::predict(boost::filesystem::path filePath, float timeInterval
 }
 
 
-std::vector<cv::Mat> ViolenceModel::buildSample(std::vector<ImageBlob> blobs)
+cv::Mat ViolenceModel::buildInterframeSample(std::vector<ImageBlob> blobs)
 {
 	assert(blobs.size() == GRACIA_K);
 	std::vector<cv::Mat> retVect;
@@ -528,25 +539,29 @@ std::vector<cv::Mat> ViolenceModel::buildSample(std::vector<ImageBlob> blobs)
 	std::vector<float> v1ExampleVec;
 	uint featureCount = 0;
 
+    // 1. Top k areas.
 	for ( uint i = 0; i < blobs.size(); i++ ) {
-
-		ImageBlob bi = blobs[i];
-
 		// Add the area and compactness.
+		ImageBlob bi = blobs[i];
 		v1ExampleVec.push_back( (float)bi.area() ); featureCount++;
-		v1ExampleVec.push_back( bi.compactness() ); featureCount++;
+	}
+    
+    // 2. Top k compactnesses.
+    for ( uint i = 0; i < blobs.size(); i++ ) {
+        // Add the area and compactness.
+        ImageBlob bi = blobs[i];
+        v1ExampleVec.push_back( (float)bi.compactness() ); featureCount++;
+    }
 
-		// Centroid x and y.
-		v1ExampleVec.push_back( bi.centroid().x ); featureCount++;
-		v1ExampleVec.push_back( bi.centroid().y ); featureCount++;
-
-		// Compute the distances of this blob from all other blobs.
-		for ( uint j = 0; j < blobs.size(); j++ ) {
-			if ( i != j ) {
-				ImageBlob bj = blobs[j];
-				v1ExampleVec.push_back( bi.distanceFrom(bj) ); featureCount++;
-			}
-		}
+    // 3. Top k centroid distances.
+	for ( uint i = 0; i < blobs.size(); i++ ) {
+		ImageBlob bi = blobs[i];
+        
+        // Compute the distances of this blob from all other blobs.
+        for ( uint j = i + 1; j < blobs.size(); j++) {
+            ImageBlob bj = blobs[j];
+            v1ExampleVec.push_back( bi.distanceFrom( bj ) ); featureCount++;
+        }
 	}
 
 	// Create a matrix based on this vector so that it can easily be added
@@ -554,9 +569,57 @@ std::vector<cv::Mat> ViolenceModel::buildSample(std::vector<ImageBlob> blobs)
 	// a column vector.  We want to eventually store it as a row, so it must
 	// also be transposed before we add it to the output std::vector.
 	cv::Mat example1Mat(v1ExampleVec);
-	retVect.push_back( example1Mat = example1Mat.t() );
+    example1Mat = example1Mat.t();  
+    
+    // Now that all properties are packed into a cv::Mat, vectorize normalization of each feature.
+    uint colBegin = 0, colEnd = (uint)blobs.size();
+    cv::Mat k_areas = example1Mat(cv::Range(0, 1), cv::Range(colBegin, colEnd));
+    float areaSum = cv::sum(k_areas)[0];
+    k_areas /= areaSum;
+    
+    colBegin = colEnd; colEnd += blobs.size();
+    cv::Mat k_compactness = example1Mat(cv::Range(0, 1), cv::Range(colBegin, colEnd));
+    float compactnessSum = cv::sum(k_areas)[0];
+    k_compactness /= compactnessSum;
 
-	return retVect;
+    colBegin = colEnd; colEnd += ( example1Mat.cols - colBegin);
+    cv::Mat distances = example1Mat(cv::Range(0, 1), cv::Range(colBegin, colEnd));
+    float sumDistances = cv::sum(distances)[0];
+    distances /= sumDistances;
+    
+	return example1Mat;
+}
+
+cv::Mat ViolenceModel::buildHistogramFeature(cv::Mat interframeSamples, unsigned short binCount)
+{
+    cv::Mat out;
+    
+    int channels[] = {0};
+    int histSize[] = {binCount};
+    
+    const float valueRange[] = {0.0, 1.0};
+    const float* ranges[] = { valueRange };
+    
+    cv::Mat tempHisto;
+    for ( uint i = 0; i < interframeSamples.cols; i++ )
+    {
+        cv::calcHist(&interframeSamples,     // Input matrix.
+                     1,                      // number of source images.                 X
+                     channels, // which channels to compute histo of.      X (ours is 1)
+                     cv::Mat(),    // do not use mask                          X (just a constructor call)
+                     tempHisto,     // the output histogram                     X (easy)
+                     1,        // Surely should be 1 for us                X (pass 1)
+                     histSize, // size (bins) of each histo in the output ( in both cases, this should be 8).  X
+                     ranges,   // valid ranges to be broken up across bins X {0, 1.0}
+                     true,     // the histogram is uniform : toy with this value!
+                     false     // never accumulate.
+                     );
+        
+        out.push_back(tempHisto);
+    }
+
+    
+    return out = out.t();
 }
 
 bool ViolenceModel::resolveDataStructures( cv::Mat **exampleStore, cv::Mat **classStore , std::map<std::string, time_t> **indexCache, bool readFileIfEmpty)
@@ -565,7 +628,6 @@ bool ViolenceModel::resolveDataStructures( cv::Mat **exampleStore, cv::Mat **cla
 	// be in sync with one another.
 	// TODO: It would be great to hide all of this functionality in a base class so there is no temptation to grab a hold
 	// 		 of any structures without properly pulling from this method.
-
 	if ( readFileIfEmpty && (!trainingExampleStore || !trainingClassStore || !trainingIndexCache) ) {
 
 		trainingExampleStore = new cv::Mat();
@@ -600,7 +662,7 @@ bool ViolenceModel::resolveDataStructures( cv::Mat **exampleStore, cv::Mat **cla
 	return trainingExampleStore && trainingClassStore && trainingIndexCache;
 }
 
-void ViolenceModel::addSample( boost::filesystem::path path, std::vector<cv::Mat> sample, bool isViolent)
+void ViolenceModel::addSample( boost::filesystem::path path, cv::Mat sample, bool isViolent)
 {
 	boost::filesystem::path absolutePath = boost::filesystem::absolute(path);
 
@@ -615,35 +677,31 @@ void ViolenceModel::addSample( boost::filesystem::path path, std::vector<cv::Mat
 
 			std::cout << "training sample at path " << absolutePath << "is not indexed. adding it.\n";
 
-			if ( sample.size() >= 1)
+			// OpenCV size is as follows.  [width (columns), height (rows)].
+			// We effectively want to resize the matrix according to the
+			// width (columns) of the training sample.
+			if ( exampleStore->size().width != sample.size().width )
 			{
-				cv::Mat v1Sample = sample[0];
-				// OpenCV size is as follows.  [width (columns), height (rows)].
-				// We effectively want to resize the matrix according to the
-				// width (columns) of the training sample.
-				if ( exampleStore->size().width != v1Sample.size().width )
-				{
-					std::cout << "updating training store size. current: " << exampleStore->size() <<"\n";
-					// Create the training store with 0 rows of the training sample's width (column count).
-					exampleStore->create(0, v1Sample.size().width, CV_32F);
-					classStore->create(0, 1, CV_32S);
-					std::cout << "new exampleStore size: " << exampleStore->size() << " classStore size:" << classStore->size() <<"\n";
-				}
-
-				// Add it to the training store.
-				exampleStore->push_back(v1Sample);
-
-				// Add the class (true or false) to the training class store.
-				cv::Mat classMat = (cv::Mat_<int>(1,1) << (int)isViolent);
-				classStore->push_back(classMat);
-				std::cout<<"exampleStore size after add: " << exampleStore->size() << " classStore size: " << classStore->size() <<"\n";
-
-				// Hash the modification date.
-				time_t modDate = boost::filesystem::last_write_time(absolutePath);
-				(*indexCache)[ createIndexKey(absolutePath) ] = modDate;
-				//std::cout << "path: " << absolutePath.generic_string() << " " << modDate << "\n";
-				//persistStore();
+				std::cout << "updating training store size. current: " << exampleStore->size() <<"\n";
+				// Create the training store with 0 rows of the training sample's width (column count).
+				exampleStore->create(0, sample.size().width, CV_32F);
+				classStore->create(0, 1, CV_32S);
+				std::cout << "new exampleStore size: " << exampleStore->size() << " classStore size:" << classStore->size() <<"\n";
 			}
+
+			// Add it to the training store.
+			exampleStore->push_back(sample);
+
+			// Add the class (true or false) to the training class store.
+			cv::Mat classMat = (cv::Mat_<int>(1,1) << (int)isViolent);
+			classStore->push_back(classMat);
+			std::cout<<"exampleStore size after add: " << exampleStore->size() << " classStore size: " << classStore->size() <<"\n";
+
+			// Hash the modification date.
+			time_t modDate = boost::filesystem::last_write_time(absolutePath);
+			(*indexCache)[ createIndexKey(absolutePath) ] = modDate;
+			//std::cout << "path: " << absolutePath.generic_string() << " " << modDate << "\n";
+			//persistStore();
 		}
 	}
 }

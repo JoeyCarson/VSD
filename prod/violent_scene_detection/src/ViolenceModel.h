@@ -42,12 +42,12 @@ public:
 	 * This path must be compliant for constructing a cv::VideoCapture object (e.g. points to a
 	 * video file that contains a supported codec video stream).
 	 */
-	std::vector<cv::Mat> extractFeatures(cv::VideoCapture capture, std::string sequenceName = "", uint frameCount = 0);
+	cv::Mat extractFeatureVector(cv::VideoCapture capture, std::string sequenceName = "", uint frameCount = 0);
 
 	/**
 	 * Preprocess the given frame, returning a mask identifying the persons in the image.
 	 */
-	static std::vector<cv::Rect> preprocess(cv::Mat &frame, cv::Mat *personMask);
+	static std::vector<cv::Rect> preprocess(cv::Mat &frame, cv::Mat *personMask = NULL);
 
 	/**
 	 * Index the resource in the file system represented by resourcePath into the training store.
@@ -133,17 +133,30 @@ private:
 												std::string indexCacheName,   std::map<std::string, time_t> &indexCache);
 
 	/**
-	 * Builds a sample based on the number of given image blobs.
-	 * Returns a vector of training samples generated for each version of Gracia's
-	 * algorithm, e.g. [0] is suitable for training v1, [1] is suitable for training v2.
+	 * Extracts an interframe sample of the properties of each of the k largest blobs.
+	 * [areas of largest blobs][compactness of largest blobs][largest:distances from others][nextlargest:distances from others]...
 	 */
-	std::vector<cv::Mat> buildSample(std::vector<ImageBlob> blobs);
+	cv::Mat extractInterframeSampleFromContours(std::vector<std::vector<cv::Point>> blobs, uint k);
+    
+	/**
+	 * Builds a sample based on the number of given image blobs.
+	 * Returns a vector of training samples generated for Gracia's algorithm.
+     * The k parameter specifies the number of blobs.  It's necessary to compute
+     * boundaries on which to normalize the features.
+	 */
+	cv::Mat buildInterframeSample(std::vector<ImageBlob> blobs);
+    
+    /**
+     * Builds a histogram binned by the binCount parameter for each feature column in the given interframeSamples.
+     * Output is a single row composed of histograms for each feature.
+     */
+    cv::Mat buildHistogramFeature(cv::Mat interframeSamples, unsigned short binCount);
 
 	/**
 	 * Add the training samples for their respective algorithms to their respective
 	 * training store.
 	 */
-	void addSample(boost::filesystem::path p, std::vector<cv::Mat> trainingSample, bool isViolent);
+	void addSample(boost::filesystem::path p, cv::Mat trainingSample, bool isViolent);
 
 	/**
 	 * Store the examples, classes, and indexes in the given file.

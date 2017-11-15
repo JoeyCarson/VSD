@@ -1,5 +1,11 @@
 # Don't include eclipse metadata associated with the project.
-.metadata 
+prod/.metadata/
+
+# Ignore XCode local user project settings.
+xcuserdata/
+
+# Ignore the Eclipse settings.
+prod/violent_scene_detection/.settings/
 
 # Ignore OS X directory databases.
 .DS_Store
@@ -14,3 +20,6 @@ RemoteSystemsTempFiles
 
 # Ignore test 
 prod/violent_scene_detection/test/video
+prod/violent_scene_detection/test/demo
+prod/violent_scene_detection/test/debug
+
