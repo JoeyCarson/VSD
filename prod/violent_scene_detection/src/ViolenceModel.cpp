@@ -253,6 +253,7 @@ void ViolenceModel::clear()
 	cv::Mat *exampleStore, *classStore;
 	std::map<std::string, time_t> *indexCache;
 
+    // Could we just delete the files?
 	resolveDataStructures(&exampleStore, &classStore, &indexCache);
 	if ( exampleStore && classStore && indexCache) {
 		exampleStore->create(0, 0, CV_32F);
@@ -425,6 +426,15 @@ cv::Mat ViolenceModel::extractInterframeSampleFromContours(std::vector<std::vect
 			topBlobsHeap.push(blob);
 		}
 	}
+    
+    // 1a. If there weren't k blobs found, create some empty ones to supplement those that are missing.
+    // There is probably a more efficient way of handling this.  Consider it in the future.
+    for ( size_t i = topBlobsHeap.size(); i < k; i++ )
+    {
+        std::vector<cv::Point> empty;
+        topBlobsHeap.push(empty);
+    }
+    
 
 	// 2. Now that we've got the k largest blobs,
 	if ( topBlobsHeap.size() == k )
@@ -569,7 +579,7 @@ cv::Mat ViolenceModel::buildInterframeSample(std::vector<ImageBlob> blobs)
 	// a column vector.  We want to eventually store it as a row, so it must
 	// also be transposed before we add it to the output std::vector.
 	cv::Mat example1Mat(v1ExampleVec);
-    example1Mat = example1Mat.t();  
+    example1Mat = example1Mat.t();
     
     // Now that all properties are packed into a cv::Mat, vectorize normalization of each feature.
     uint colBegin = 0, colEnd = (uint)blobs.size();
