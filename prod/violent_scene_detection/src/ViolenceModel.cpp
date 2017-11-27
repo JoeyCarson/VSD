@@ -585,18 +585,20 @@ cv::Mat ViolenceModel::buildInterframeSample(std::vector<ImageBlob> blobs)
     uint colBegin = 0, colEnd = (uint)blobs.size();
     cv::Mat k_areas = example1Mat(cv::Range(0, 1), cv::Range(colBegin, colEnd));
     float areaSum = cv::sum(k_areas)[0];
-    k_areas /= areaSum;
+    // std::cout << "sum: " << areaSum << "\nmat: \n" << k_areas << "\n";
+    if ( areaSum > 0 ) k_areas /= areaSum;
     
     colBegin = colEnd; colEnd += blobs.size();
     cv::Mat k_compactness = example1Mat(cv::Range(0, 1), cv::Range(colBegin, colEnd));
     float compactnessSum = cv::sum(k_areas)[0];
-    k_compactness /= compactnessSum;
+    if ( compactnessSum > 0 ) k_compactness /= compactnessSum;
 
-    colBegin = colEnd; colEnd += ( example1Mat.cols - colBegin);
+    colBegin = colEnd; colEnd = example1Mat.cols;
     cv::Mat distances = example1Mat(cv::Range(0, 1), cv::Range(colBegin, colEnd));
     float sumDistances = cv::sum(distances)[0];
-    distances /= sumDistances;
+    if ( sumDistances > 0 ) distances /= sumDistances;
     
+    //std::cout << "norm: \n" << example1Mat << "\n";
 	return example1Mat;
 }
 
@@ -611,9 +613,13 @@ cv::Mat ViolenceModel::buildHistogramFeature(cv::Mat interframeSamples, unsigned
     const float* ranges[] = { valueRange };
     
     cv::Mat tempHisto;
+    cv::Range allRows = cv::Range::all();
     for ( uint i = 0; i < interframeSamples.cols; i++ )
     {
-        cv::calcHist(&interframeSamples,     // Input matrix.
+        cv::Mat col_i = interframeSamples(allRows, cv::Range(i, i + 1));
+        //std::cout << "col_i: " << col_i << "\n";
+        
+        cv::calcHist(&col_i,     // Input matrix.
                      1,                      // number of source images.                 X
                      channels, // which channels to compute histo of.      X (ours is 1)
                      cv::Mat(),    // do not use mask                          X (just a constructor call)
@@ -625,6 +631,7 @@ cv::Mat ViolenceModel::buildHistogramFeature(cv::Mat interframeSamples, unsigned
                      false     // never accumulate.
                      );
         
+        //std::cout << "tempHisto: " << tempHisto << "\n";
         out.push_back(tempHisto);
     }
 
