@@ -638,11 +638,13 @@ cv::Mat ViolenceModel::buildHistogramFeature(cv::Mat interframeSamples, unsigned
                      true,     // the histogram is uniform : toy with this value!
                      false     // never accumulate.
                      );
-        
         //std::cout << "tempHisto: " << tempHisto << "\n";
         out.push_back(tempHisto);
     }
 
+    // Normalize all histograms by the total number of interframes.
+    uint interFrameCount = interframeSamples.rows;
+    out /= interFrameCount;
     
     return out = out.t();
 }
