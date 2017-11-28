@@ -609,21 +609,29 @@ cv::Mat ViolenceModel::buildHistogramFeature(cv::Mat interframeSamples, unsigned
     int channels[] = {0};
     int histSize[] = {binCount};
     
-    const float valueRange[] = {0.0, 1.0};
-    const float* ranges[] = { valueRange };
-    
     cv::Mat tempHisto;
     cv::Range allRows = cv::Range::all();
+    // From left to right, each (8 uint) histogram intends to convey the likelihood of the (i % 8)'th
+    // largest blob's area or compactness or proximity (depending on the value of i) to fall in each bin for the given class.
+    // This makes the feature vector easy to reason with using a decision tree, which we ultimately use in LearningKernel.
     for ( uint i = 0; i < interframeSamples.cols; i++ )
     {
         cv::Mat col_i = interframeSamples(allRows, cv::Range(i, i + 1));
         //std::cout << "col_i: " << col_i << "\n";
         
-        cv::calcHist(&col_i,     // Input matrix.
-                     1,                      // number of source images.                 X
+        // Compute the boundaries of the the data, such that we can evenly distribute the energy.
+        // Each of the areas is normalized according to the sum of all areas.  This yields the
+        // percentage of the motion area that each of the k blobs are.
+        double lowBound = 0, highBound = 0;
+        cv::minMaxLoc(col_i, &lowBound, &highBound);
+        const float valueRange[] = { (float)lowBound, (float)highBound };
+        const float* ranges[] = { valueRange };
+
+        cv::calcHist(&col_i,   // Input matrix.
+                     1,        // number of source images.                 X
                      channels, // which channels to compute histo of.      X (ours is 1)
-                     cv::Mat(),    // do not use mask                          X (just a constructor call)
-                     tempHisto,     // the output histogram                     X (easy)
+                     cv::Mat(),// do not use mask                          X (just a constructor call)
+                     tempHisto,// the output histogram                     X (easy)
                      1,        // Surely should be 1 for us                X (pass 1)
                      histSize, // size (bins) of each histo in the output ( in both cases, this should be 8).  X
                      ranges,   // valid ranges to be broken up across bins X {0, 1.0}
