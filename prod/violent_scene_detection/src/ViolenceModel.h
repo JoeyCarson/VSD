@@ -42,7 +42,7 @@ public:
 	 * This path must be compliant for constructing a cv::VideoCapture object (e.g. points to a
 	 * video file that contains a supported codec video stream).
 	 */
-	cv::Mat extractFeatureVector(cv::VideoCapture capture, std::string sequenceName = "", uint frameCount = 0);
+	cv::Mat extractFeatureVector(cv::VideoCapture capture, std::string sequenceName = "", uint frameCount = 50);
 
 	/**
 	 * Preprocess the given frame, returning a mask identifying the persons in the image.
